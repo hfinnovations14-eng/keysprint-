@@ -1,20 +1,31 @@
 import React, { useState } from 'react';
-import { User, AlertCircle, Play, Sparkles } from 'lucide-react';
+import { User, AlertCircle, Play, Loader2 } from 'lucide-react';
 import { SvgCar } from '../../components/common/SvgCar';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen09GuestEntryProps {
   onNavigate: (screenId: string) => void;
 }
 
 export const Screen09GuestEntry: React.FC<Screen09GuestEntryProps> = ({ onNavigate }) => {
+  const { guestLogin } = useAuth();
   const [guestName, setGuestName] = useState('Guest_' + Math.floor(1000 + Math.random() * 9000));
   const [selectedAvatar, setSelectedAvatar] = useState('🏎️');
+  const [loading, setLoading] = useState(false);
 
   const avatars = ['🏎️', '⚡', '🚀', '🐱', '🦊', '🦁', '🤖', '👑'];
 
-  const handleStartGuest = (e: React.FormEvent) => {
+  const handleStartGuest = async (e: React.FormEvent) => {
     e.preventDefault();
-    onNavigate('screen-10'); // Jump straight into mode selection!
+    setLoading(true);
+    try {
+      await guestLogin(guestName);
+      onNavigate('screen-10'); // Jump straight into mode selection!
+    } catch {
+      onNavigate('screen-10');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,6 +64,7 @@ export const Screen09GuestEntry: React.FC<Screen09GuestEntryProps> = ({ onNaviga
                   className="input-field with-icon"
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -66,6 +78,7 @@ export const Screen09GuestEntry: React.FC<Screen09GuestEntryProps> = ({ onNaviga
                     type="button"
                     className={`avatar-choice-btn ${selectedAvatar === av ? 'active' : ''}`}
                     onClick={() => setSelectedAvatar(av)}
+                    disabled={loading}
                   >
                     {av}
                   </button>
@@ -73,9 +86,17 @@ export const Screen09GuestEntry: React.FC<Screen09GuestEntryProps> = ({ onNaviga
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-lg full-width mt-4">
-              <Play size={18} fill="#FFFFFF" />
-              <span>Launch Race Mode</span>
+            <button type="submit" className="btn btn-primary btn-lg full-width mt-4" disabled={loading}>
+              {loading ? (
+                <span className="flex-center gap-2">
+                  <Loader2 size={18} className="animate-spin" /> Preparing Grid...
+                </span>
+              ) : (
+                <>
+                  <Play size={18} fill="#FFFFFF" />
+                  <span>Launch Race Mode</span>
+                </>
+              )}
             </button>
 
             <div className="auth-footer-link text-center mt-3">

@@ -1,22 +1,47 @@
-import React, { useState } from 'react';
-import { User, Globe, Shield, Save, ArrowLeft, Camera } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Globe, Shield, Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen21EditProfileProps {
   onNavigate: (screenId: string) => void;
 }
 
 export const Screen21EditProfile: React.FC<Screen21EditProfileProps> = ({ onNavigate }) => {
-  const [nickname, setNickname] = useState('AlexPro');
-  const [country, setCountry] = useState('United States');
-  const [bio, setBio] = useState('Typing enthusiast and sports car collector. Aiming for 180+ WPM!');
+  const { user, updateProfile } = useAuth();
+  const [nickname, setNickname] = useState(user?.profile?.nickname || 'AlexPro');
+  const [country, setCountry] = useState(user?.profile?.countryCode || 'US');
+  const [bio, setBio] = useState(user?.profile?.bio || 'Typing enthusiast and sports car collector. Aiming for 180+ WPM!');
   const [profilePublic, setProfilePublic] = useState(true);
-  const [selectedAvatar, setSelectedAvatar] = useState('🏎️');
+  const [selectedAvatar, setSelectedAvatar] = useState(user?.profile?.avatarId || '🏎️');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.profile) {
+      setNickname(user.profile.nickname);
+      setCountry(user.profile.countryCode || 'US');
+      if (user.profile.bio) setBio(user.profile.bio);
+      if (user.profile.avatarId) setSelectedAvatar(user.profile.avatarId);
+    }
+  }, [user]);
 
   const avatarChoices = ['🏎️', '⚡', '🌸', '🥷', '🚀', '🔥', '💥', '🎯', '👑', '🐱'];
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    onNavigate('screen-20'); // Back to profile
+    setLoading(true);
+    try {
+      await updateProfile({
+        nickname,
+        avatarId: selectedAvatar,
+        countryCode: country,
+        bio
+      });
+      onNavigate('screen-20'); // Back to profile
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,6 +74,7 @@ export const Screen21EditProfile: React.FC<Screen21EditProfileProps> = ({ onNavi
                     type="button"
                     className={`avatar-tile ${selectedAvatar === av ? 'active' : ''}`}
                     onClick={() => setSelectedAvatar(av)}
+                    disabled={loading}
                   >
                     <span>{av}</span>
                   </button>
@@ -58,65 +84,79 @@ export const Screen21EditProfile: React.FC<Screen21EditProfileProps> = ({ onNavi
 
             <div className="input-group mb-3">
               <label className="input-label">Public Nickname</label>
-              <input 
-                type="text" 
-                required 
-                maxLength={20}
-                className="input-field"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-              />
-              <span className="text-xs text-secondary">Visible on leaderboards and in-race lanes.</span>
+              <div className="input-icon-wrap">
+                <User size={18} className="input-field-icon" />
+                <input 
+                  type="text" 
+                  required 
+                  maxLength={16}
+                  className="input-field with-icon"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
             </div>
 
             <div className="input-group mb-3">
               <label className="input-label">Country Representation</label>
-              <select 
-                className="input-field"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-              >
-                <option value="United States">🇺🇸 United States</option>
-                <option value="Canada">🇨🇦 Canada</option>
-                <option value="Germany">🇩🇪 Germany</option>
-                <option value="United Kingdom">🇬🇧 United Kingdom</option>
-                <option value="Japan">🇯🇵 Japan</option>
-                <option value="Australia">🇦🇺 Australia</option>
-                <option value="France">🇫🇷 France</option>
-              </select>
+              <div className="input-icon-wrap">
+                <Globe size={18} className="input-field-icon" />
+                <select 
+                  className="input-field with-icon"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="US">🇺🇸 United States</option>
+                  <option value="PK">🇵🇰 Pakistan</option>
+                  <option value="GB">🇬🇧 United Kingdom</option>
+                  <option value="CA">🇨🇦 Canada</option>
+                  <option value="DE">🇩🇪 Germany</option>
+                  <option value="JP">🇯🇵 Japan</option>
+                  <option value="BR">🇧🇷 Brazil</option>
+                  <option value="IN">🇮🇳 India</option>
+                  <option value="AU">🇦🇺 Australia</option>
+                </select>
+              </div>
             </div>
 
-            <div className="input-group mb-3">
-              <label className="input-label">Short Bio</label>
+            <div className="input-group mb-4">
+              <label className="input-label">Driver Bio</label>
               <textarea 
                 rows={3}
-                className="input-field"
+                maxLength={180}
+                className="input-field textarea-field"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
+                disabled={loading}
               />
             </div>
 
-            {/* Privacy Toggles */}
-            <div className="privacy-settings-box card-cream mb-4">
-              <label className="toggle-row">
+            <div className="checkbox-row mb-4">
+              <label className="checkbox-label">
                 <input 
-                  type="checkbox"
-                  checked={profilePublic}
-                  onChange={(e) => setProfilePublic(e.target.checked)}
+                  type="checkbox" 
+                  checked={profilePublic} 
+                  onChange={(e) => setProfilePublic(e.target.checked)} 
+                  disabled={loading}
                 />
-                <div>
-                  <strong>Public Profile & Statistics</strong>
-                  <p className="text-xs text-secondary">Allow other racers to view your speed badges and garage collection.</p>
-                </div>
+                <span>Show profile and statistics on public leaderboards</span>
               </label>
             </div>
 
-            <div className="form-actions-row">
-              <button type="submit" className="btn btn-primary btn-lg">
-                <Save size={18} />
-                <span>Save Changes</span>
-              </button>
-            </div>
+            <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
+              {loading ? (
+                <span className="flex-center gap-2">
+                  <Loader2 size={18} className="animate-spin" /> Saving Changes...
+                </span>
+              ) : (
+                <>
+                  <Save size={18} />
+                  <span>Save Driver Changes</span>
+                </>
+              )}
+            </button>
           </form>
         </div>
       </div>

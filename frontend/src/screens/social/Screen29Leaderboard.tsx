@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Trophy, Globe, Users, Flag, Search, ChevronRight, Award } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trophy, Globe, Users, Flag, Search, ChevronRight, Award, Loader2 } from 'lucide-react';
+import { api } from '../../services/api';
 import { GLOBAL_LEADERBOARD, LeaderboardUser } from '../../data/mockData';
 
 interface Screen29LeaderboardProps {
@@ -9,17 +10,54 @@ interface Screen29LeaderboardProps {
 export const Screen29Leaderboard: React.FC<Screen29LeaderboardProps> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'Global' | 'Friends' | 'Country'>('Global');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dbLeaderboard, setDbLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredUsers = GLOBAL_LEADERBOARD.filter(u => 
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true);
+      try {
+        const countryParam = activeTab === 'Country' ? 'US' : undefined;
+        const res = await api.getLeaderboard(countryParam);
+        if (res.leaderboard && res.leaderboard.length > 0) {
+          setDbLeaderboard(res.leaderboard);
+        }
+      } catch (e) {
+        console.error('Failed to fetch leaderboard:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [activeTab]);
+
+  // Combine DB data or fallback to mock
+  const sourceList = dbLeaderboard.length >= 3 ? dbLeaderboard.map((item: any) => ({
+    rank: item.rank,
+    name: item.nickname,
+    avatar: item.avatar || '🏎️',
+    wpm: item.wpm,
+    accuracy: item.accuracy,
+    races: item.races,
+    country: item.country === 'PK' ? '🇵🇰 Pakistan' : item.country === 'GB' ? '🇬🇧 United Kingdom' : '🇺🇸 United States',
+    isYou: false
+  })) : GLOBAL_LEADERBOARD;
+
+  const filteredUsers = sourceList.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.country.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const top1 = filteredUsers[0] || GLOBAL_LEADERBOARD[0];
+  const top2 = filteredUsers[1] || GLOBAL_LEADERBOARD[1];
+  const top3 = filteredUsers[2] || GLOBAL_LEADERBOARD[2];
 
   return (
     <div className="screen-page leaderboard-screen">
       <div className="content-wrapper">
         
-        {/* HEADER & TABS (Matching Reference Image 04) */}
+        {/* HEADER & TABS */}
         <div className="leaderboard-header-row mb-4">
           <div>
             <span className="badge badge-gold">Hall of Speed</span>
@@ -45,114 +83,100 @@ export const Screen29Leaderboard: React.FC<Screen29LeaderboardProps> = ({ onNavi
           {/* 2nd Place Silver */}
           <div className="podium-card card card-cream place-2">
             <div className="podium-crown">🥈</div>
-            <div className="podium-avatar">⚡</div>
-            <h3>TypeMaster</h3>
-            <span className="podium-country">🇩🇪 Germany</span>
+            <div className="podium-avatar">{top2.avatar}</div>
+            <h3>{top2.name}</h3>
+            <span className="podium-country">{top2.country}</span>
             <div className="podium-stat-pill">
-              <strong>175</strong> WPM • 98% Acc
+              <strong>{top2.wpm}</strong> WPM • {top2.accuracy}% Acc
             </div>
-            <span className="podium-races-sub">980 Races</span>
+            <span className="podium-races-sub">{top2.races} Races</span>
           </div>
 
           {/* 1st Place Gold */}
           <div className="podium-card card card-cream place-1">
             <div className="podium-crown gold-crown">👑 🥇</div>
-            <div className="podium-avatar">🏎️</div>
-            <h3>AlexPro</h3>
-            <span className="podium-country">🇺🇸 United States</span>
-            <div className="podium-stat-pill gold">
-              <strong>182</strong> WPM • 99% Acc
+            <div className="podium-avatar">{top1.avatar}</div>
+            <h3>{top1.name}</h3>
+            <span className="podium-country">{top1.country}</span>
+            <div className="podium-stat-pill gold-pill">
+              <strong>{top1.wpm}</strong> WPM • {top1.accuracy}% Acc
             </div>
-            <span className="podium-races-sub">1,240 Races</span>
+            <span className="podium-races-sub">{top1.races} Races • Grand Prix Champion</span>
           </div>
 
           {/* 3rd Place Bronze */}
           <div className="podium-card card card-cream place-3">
             <div className="podium-crown">🥉</div>
-            <div className="podium-avatar">🌸</div>
-            <h3>SpeedyGirl</h3>
-            <span className="podium-country">🇨🇦 Canada</span>
+            <div className="podium-avatar">{top3.avatar}</div>
+            <h3>{top3.name}</h3>
+            <span className="podium-country">{top3.country}</span>
             <div className="podium-stat-pill">
-              <strong>170</strong> WPM • 98% Acc
+              <strong>{top3.wpm}</strong> WPM • {top3.accuracy}% Acc
             </div>
-            <span className="podium-races-sub">860 Races</span>
+            <span className="podium-races-sub">{top3.races} Races</span>
           </div>
         </div>
 
-        {/* SEARCH & LEADERBOARD TABLE (Matching Reference Image 04) */}
-        <div className="leaderboard-table-card card">
-          <div className="table-search-bar mb-3">
-            <div className="input-icon-wrap flex-1">
+        {/* SEARCH & LEADERBOARD TABLE */}
+        <div className="card">
+          <div className="table-search-row mb-3">
+            <div className="input-icon-wrap search-box">
               <Search size={18} className="input-field-icon" />
               <input 
                 type="text" 
-                placeholder="Search driver by nickname or country..."
+                placeholder="Search racers by name or nation..." 
                 className="input-field with-icon"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {loading && (
+              <span className="flex-center gap-2 text-sm text-secondary">
+                <Loader2 size={16} className="animate-spin" /> Syncing live database...
+              </span>
+            )}
           </div>
 
           <div className="races-table-wrapper">
-            <table className="custom-table leaderboard-table">
+            <table className="custom-table">
               <thead>
                 <tr>
-                  <th style={{ width: '80px' }}>Rank</th>
-                  <th>Player</th>
-                  <th>Speed (WPM)</th>
+                  <th>Rank</th>
+                  <th>Driver</th>
+                  <th>Country</th>
+                  <th>Peak Speed</th>
                   <th>Accuracy</th>
-                  <th>Races</th>
+                  <th>Total Races</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((player) => (
-                  <tr 
-                    key={player.rank}
-                    className={player.isCurrentUser ? 'current-user-row' : ''}
-                    onClick={() => onNavigate('screen-20')}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <span className={`board-rank-pill rank-${player.rank <= 3 ? player.rank : 'norm'}`}>
-                        #{player.rank}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="board-player-cell">
-                        <span className="b-avatar">{player.avatar}</span>
-                        <div>
-                          <strong className="b-name">{player.name}</strong>
-                          {player.isCurrentUser && <span className="you-pill">YOU</span>}
-                          <div className="b-country text-xs text-secondary">{player.country}</div>
+                {filteredUsers.map((racer, idx) => {
+                  const isCurrentUser = (racer as any).isYou;
+                  return (
+                    <tr key={idx} className={isCurrentUser ? 'current-user-row' : ''}>
+                      <td>
+                        <span className={`rank-badge rank-${racer.rank <= 3 ? racer.rank : 'other'}`}>
+                          #{racer.rank}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex-center gap-2 justify-start">
+                          <span className="driver-avatar-mini">{racer.avatar}</span>
+                          <strong>{racer.name}</strong>
+                          {isCurrentUser && <span className="badge badge-orange text-xs">YOU</span>}
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="b-wpm font-bold">{player.wpm}</span> WPM
-                    </td>
-                    <td>{player.accuracy}%</td>
-                    <td className="text-secondary">{player.races.toLocaleString()}</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td>{racer.country}</td>
+                      <td><strong>{racer.wpm} WPM</strong></td>
+                      <td>{racer.accuracy}%</td>
+                      <td>{racer.races}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-
-          {/* PINNED PERSONAL POSITION (SRS FR-L04) */}
-          <div className="pinned-personal-rank card-cream mt-3">
-            <div className="pinned-left">
-              <span className="badge badge-orange">Your Verified Standing</span>
-              <span>You are ranked <strong>#1 Globally</strong> with <strong>182 WPM</strong> peak.</span>
-            </div>
-            <button 
-              className="btn btn-secondary btn-sm"
-              onClick={() => onNavigate('screen-22')}
-            >
-              Telemetry Stats
-            </button>
-          </div>
-
         </div>
 
       </div>

@@ -3,6 +3,7 @@ import { ScreenSwitcherToolbar, ViewportMode, SCREEN_INVENTORY } from './compone
 import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { CarModelId } from './components/common/SvgCar';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // PUBLIC SCREENS
 import { Screen01Homepage } from './screens/public/Screen01Homepage';
@@ -75,18 +76,21 @@ import { Admin09StaffAudit } from './screens/admin/Admin09StaffAudit';
 import { ScreenResponsiveViews } from './screens/responsive/ScreenResponsiveViews';
 import { ScreenOverviewBoard } from './screens/overview/ScreenOverviewBoard';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { user, updateCoins, equipCar } = useAuth();
   const [currentScreenId, setCurrentScreenId] = useState<string>('screen-01');
   const [viewport, setViewport] = useState<ViewportMode>('desktop');
-  const [userCoins, setUserCoins] = useState<number>(2450);
-  const [userLevel, setUserLevel] = useState<number>(12);
-  const [equippedCar, setEquippedCar] = useState<CarModelId>('blaze');
+
+  const liveCoins = user?.stats?.coins ?? 2450;
+  const liveLevel = user?.stats?.level ?? 12;
+  const equippedCarItem = user?.inventory?.find(i => i.isEquipped);
+  const liveEquippedCar: CarModelId = (equippedCarItem?.itemId as CarModelId) || 'blaze';
 
   const isAdminScreen = currentScreenId.startsWith('admin-');
 
   // Handle Coin deductions from shop
   const handlePurchaseItem = (cost: number) => {
-    setUserCoins(prev => Math.max(0, prev - cost));
+    updateCoins(Math.max(0, liveCoins - cost));
   };
 
   // Render Screen Content
@@ -158,7 +162,7 @@ export const App: React.FC = () => {
 
       // SECTION D — ACCOUNT
       case 'screen-19':
-        return <Screen19Dashboard onNavigate={setCurrentScreenId} level={userLevel} />;
+        return <Screen19Dashboard onNavigate={setCurrentScreenId} level={liveLevel} />;
       case 'screen-20':
         return <Screen20Profile onNavigate={setCurrentScreenId} />;
       case 'screen-21':
@@ -173,15 +177,15 @@ export const App: React.FC = () => {
         return (
           <Screen24Garage 
             onNavigate={setCurrentScreenId}
-            equippedCarId={equippedCar}
-            onEquipCar={(id) => setEquippedCar(id)}
+            equippedCarId={liveEquippedCar}
+            onEquipCar={(id) => equipCar(id)}
           />
         );
       case 'screen-25':
         return (
           <Screen25Shop 
             onNavigate={setCurrentScreenId}
-            coins={userCoins}
+            coins={liveCoins}
             onPurchaseItem={handlePurchaseItem}
           />
         );
@@ -196,7 +200,7 @@ export const App: React.FC = () => {
                 carId: 'golden',
                 desc: 'Gold-plated aerodynamic composite chassis.'
               }}
-              userCoins={userCoins}
+              userCoins={liveCoins}
               onClose={() => setCurrentScreenId('screen-25')}
               onConfirm={handlePurchaseItem}
             />
@@ -208,9 +212,7 @@ export const App: React.FC = () => {
         return (
           <Screen28DailyChallenges 
             onNavigate={setCurrentScreenId}
-            onClaimReward={(c, xp) => {
-              setUserCoins(prev => prev + c);
-            }}
+            onClaimReward={(c) => updateCoins(liveCoins + c)}
           />
         );
 
@@ -271,8 +273,8 @@ export const App: React.FC = () => {
             <Header
               currentScreenId={currentScreenId}
               onNavigate={setCurrentScreenId}
-              coins={userCoins}
-              level={userLevel}
+              coins={liveCoins}
+              level={liveLevel}
             />
           )}
 
@@ -290,4 +292,13 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+};
+
 export default App;

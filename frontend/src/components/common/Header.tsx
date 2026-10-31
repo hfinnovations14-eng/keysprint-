@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Trophy, ShoppingBag, Flag, User, Bell, ChevronDown, Sparkles, Shield, Wrench, Menu, X } from 'lucide-react';
+import { Trophy, ShoppingBag, Flag, User, Bell, ChevronDown, Sparkles, Shield, Wrench, Menu, X, LogOut } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface HeaderProps {
   currentScreenId: string;
@@ -13,13 +14,18 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentScreenId,
   onNavigate,
-  coins = 2450,
-  level = 12,
-  username = 'AlexPro',
-  isAuthenticated = true
+  coins: propCoins,
+  level: propLevel,
+  username: propUsername
 }) => {
+  const { user, isAuthenticated, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const displayCoins = user?.stats?.coins !== undefined ? user.stats.coins : (propCoins ?? 2500);
+  const displayLevel = user?.stats?.level || propLevel || 1;
+  const displayUsername = user?.profile?.nickname || propUsername || 'Driver';
+  const displayAvatar = user?.profile?.avatarId || '🏎️';
 
   const navItems = [
     { id: 'screen-01', label: 'Home' },
@@ -111,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
                 title="Your Virtual Coin Balance (Earned by Racing)"
               >
                 <span className="coin-icon">🪙</span>
-                <span className="coin-amount">{coins.toLocaleString()}</span>
+                <span className="coin-amount">{displayCoins.toLocaleString()}</span>
               </div>
 
               {/* Notification Bell */}
@@ -126,15 +132,16 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Player Avatar & Level Pill */}
               <div 
-                className="user-pill"
+                className="user-pill cursor-pointer"
                 onClick={() => onNavigate('screen-19')}
+                title="View Dashboard"
               >
                 <div className="user-avatar-small">
-                  <span>🏎️</span>
+                  <span>{displayAvatar}</span>
                 </div>
                 <div className="user-info-text">
-                  <span className="user-name">{username}</span>
-                  <span className="user-level-badge">Lv. {level}</span>
+                  <span className="user-name">{displayUsername}</span>
+                  <span className="user-level-badge">Lv. {displayLevel}</span>
                 </div>
               </div>
 
@@ -146,9 +153,21 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Wrench size={18} />
               </button>
+
+              {/* Logout button */}
+              <button
+                className="icon-action-btn hover:text-red-500"
+                onClick={() => {
+                  logout();
+                  onNavigate('screen-01');
+                }}
+                title="Sign Out"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           ) : (
-            <div className="guest-actions">
+            <div className="guest-actions flex-center gap-2">
               <button 
                 className="btn btn-outline btn-sm"
                 onClick={() => onNavigate('screen-05')}
@@ -181,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
             {navItems.map((item) => (
               <button
                 key={item.id}
-                className="mobile-nav-item"
+                className="mobile-link"
                 onClick={() => {
                   onNavigate(item.id);
                   setMobileMenuOpen(false);
@@ -194,7 +213,7 @@ export const Header: React.FC<HeaderProps> = ({
             {moreItems.map((item) => (
               <button
                 key={item.id}
-                className="mobile-nav-item secondary"
+                className="mobile-link"
                 onClick={() => {
                   onNavigate(item.id);
                   setMobileMenuOpen(false);
