@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Trophy, Zap, Clock, Coins, Star, RotateCcw, Share2, ArrowLeft } from 'lucide-react';
-import { SvgCar } from '../../components/common/SvgCar';
 import confetti from 'canvas-confetti';
+import { useRace } from '../../context/RaceContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen16RaceResultsProps {
   onNavigate: (screenId: string) => void;
@@ -14,37 +15,62 @@ interface Screen16RaceResultsProps {
 
 export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
   onNavigate,
-  wpm = 142,
-  accuracy = 98,
-  time = '01:26',
-  coinsEarned = 50,
-  xpEarned = 120
+  wpm: propWpm,
+  accuracy: propAcc,
+  time: propTime,
+  coinsEarned: propCoins,
+  xpEarned: propXp
 }) => {
+  const { user } = useAuth();
+  const { lastResult, joinMatchmaking } = useRace();
+
+  const finalWpm = lastResult?.wpm ?? propWpm ?? 132;
+  const finalAcc = lastResult?.accuracy ?? propAcc ?? 98;
+  const finalTime = lastResult?.time ?? propTime ?? '00:45';
+  const finalCoins = lastResult?.coinsEarned ?? propCoins ?? 150;
+  const finalXp = lastResult?.xpEarned ?? propXp ?? 100;
+  const finalPlace = lastResult?.place ?? 1;
+
   useEffect(() => {
     // Fire celebratory confetti on mount
     try {
       confetti({
-        particleCount: 80,
-        spread: 70,
+        particleCount: 85,
+        spread: 80,
         origin: { y: 0.6 }
       });
-    } catch (e) {
+    } catch {
       // Confetti fallback
     }
   }, []);
+
+  const handlePlayAgain = () => {
+    joinMatchmaking();
+    onNavigate('screen-11');
+  };
+
+  const getPlacementTitle = () => {
+    if (finalPlace === 1) return 'You Finished 1st! 🏆';
+    if (finalPlace === 2) return 'You Finished 2nd! 🥈';
+    if (finalPlace === 3) return 'You Finished 3rd! 🥉';
+    return `You Finished #${finalPlace}!`;
+  };
+
+  const currentLevel = user?.stats?.level || 1;
+  const currentXp = user?.stats?.xp || 200;
 
   return (
     <div className="screen-page results-screen">
       <div className="content-wrapper">
         <div className="results-celebration-card card">
-          {/* HEADER / CELEBRATION (Matching Reference Image 10) */}
+          {/* HEADER / CELEBRATION */}
           <div className="results-hero-header text-center">
             <div className="podium-trophy-ring">
               <Trophy size={48} className="trophy-gold" />
             </div>
-            <h1 className="results-headline">You Finished 1st!</h1>
+            <h1 className="results-headline">{getPlacementTitle()}</h1>
             <p className="text-secondary text-sm">
-              Incredible driving! You dominated the asphalt in Green Valley.
+              Incredible driving! Saved to your official KeySprint career records.
             </p>
           </div>
 
@@ -56,17 +82,17 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
               className="results-stage-img"
             />
             <div className="results-stage-badge">
-              <span className="badge-flame">🏆</span>
-              <span>1st Place Champion</span>
+              <span className="badge-flame">🏁</span>
+              <span>Podium Rank #{finalPlace}</span>
             </div>
           </div>
 
-          {/* PERFORMANCE METRICS GRID (Matching Reference Image 10) */}
+          {/* PERFORMANCE METRICS GRID */}
           <div className="results-metrics-grid mt-4">
             <div className="result-metric-card card-cream">
               <div className="metric-icon blue"><Zap size={22} /></div>
               <div className="metric-content">
-                <span className="metric-big-number">{wpm} WPM</span>
+                <span className="metric-big-number">{finalWpm} WPM</span>
                 <span className="metric-sublabel">Typing Speed</span>
               </div>
             </div>
@@ -74,7 +100,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
             <div className="result-metric-card card-cream">
               <div className="metric-icon green"><Trophy size={22} /></div>
               <div className="metric-content">
-                <span className="metric-big-number">{accuracy}%</span>
+                <span className="metric-big-number">{finalAcc}%</span>
                 <span className="metric-sublabel">Accuracy</span>
               </div>
             </div>
@@ -82,7 +108,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
             <div className="result-metric-card card-cream">
               <div className="metric-icon purple"><Clock size={22} /></div>
               <div className="metric-content">
-                <span className="metric-big-number">{time}</span>
+                <span className="metric-big-number">{finalTime}</span>
                 <span className="metric-sublabel">Race Time</span>
               </div>
             </div>
@@ -90,7 +116,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
             <div className="result-metric-card card-cream">
               <div className="metric-icon gold"><Coins size={22} /></div>
               <div className="metric-content">
-                <span className="metric-big-number">+{coinsEarned}</span>
+                <span className="metric-big-number">+{finalCoins}</span>
                 <span className="metric-sublabel">Coins Earned</span>
               </div>
             </div>
@@ -98,7 +124,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
             <div className="result-metric-card card-cream">
               <div className="metric-icon orange"><Star size={22} /></div>
               <div className="metric-content">
-                <span className="metric-big-number">+{xpEarned}</span>
+                <span className="metric-big-number">+{finalXp}</span>
                 <span className="metric-sublabel">XP Gained</span>
               </div>
             </div>
@@ -107,22 +133,22 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
           {/* LEVEL PROGRESS BAR */}
           <div className="results-xp-bar-container card-cream mt-4">
             <div className="xp-bar-header">
-              <span>Driver Level 12</span>
-              <span><strong>840 / 1,500 XP</strong> (+{xpEarned} XP)</span>
+              <span>Driver Level {currentLevel}</span>
+              <span><strong>{currentXp} XP</strong> (+{finalXp} XP)</span>
             </div>
             <div className="xp-bar-track">
-              <div className="xp-bar-fill" style={{ width: '56%' }} />
+              <div className="xp-bar-fill" style={{ width: `${Math.min(100, (currentXp % 1000) / 10)}%` }} />
             </div>
           </div>
 
-          {/* ACTION BUTTONS (Matching Reference Image 10) */}
+          {/* ACTION BUTTONS */}
           <div className="results-actions-row mt-4">
             <button 
               className="btn btn-primary btn-lg"
-              onClick={() => onNavigate('screen-13')}
+              onClick={handlePlayAgain}
             >
               <RotateCcw size={18} />
-              <span>Play Again</span>
+              <span>Race Again</span>
             </button>
 
             <button 
@@ -130,15 +156,14 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
               onClick={() => onNavigate('screen-10')}
             >
               <ArrowLeft size={18} />
-              <span>Back to Lobby</span>
+              <span>Back to Modes</span>
             </button>
 
             <button 
               className="btn btn-outline btn-lg"
-              onClick={() => alert('Race result copied to clipboard!')}
+              onClick={() => onNavigate('screen-19')}
             >
-              <Share2 size={18} />
-              <span>Share Result</span>
+              <span>Driver Dashboard</span>
             </button>
           </div>
         </div>

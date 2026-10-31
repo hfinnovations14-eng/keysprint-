@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, Volume2, VolumeX, Eye, Flag, Zap, RotateCcw, AlertTriangle } from 'lucide-react';
-import { SvgCar } from '../../components/common/SvgCar';
+import { SvgCar, CarModelId } from '../../components/common/SvgCar';
+import { useRace } from '../../context/RaceContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen13LiveRaceProps {
   onNavigate: (screenId: string) => void;
@@ -9,53 +11,50 @@ interface Screen13LiveRaceProps {
 
 export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({ 
   onNavigate,
-  passageText = "The quick brown fox jumps over the lazy dog while sports cars thunder down the championship asphalt highway."
+  passageText: propPassageText
 }) => {
+  const { user } = useAuth();
+  const { passageText: racePassage, players, sendProgress, submitFinalRace } = useRace();
+  
+  const activePassage = propPassageText || racePassage || "The quick brown fox jumps over the lazy dog while sports cars thunder down the championship asphalt highway at breakneck velocity.";
+
   const [typedInput, setTypedInput] = useState('');
   const [errorIndex, setErrorIndex] = useState<number | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [wpm, setWpm] = useState(128);
-  const [accuracy, setAccuracy] = useState(98);
+  const [wpm, setWpm] = useState(0);
+  const [accuracy, setAccuracy] = useState(100);
   const [totalKeystrokes, setTotalKeystrokes] = useState(0);
   const [correctKeystrokes, setCorrectKeystrokes] = useState(0);
-
-  // Opponent AI progress (0 to 100%)
-  const [opponents, setOpponents] = useState([
-    { id: 'emma', name: 'Emma', car: 'golden', avatar: '👩‍🦰', progress: 38, wpm: 122, rank: 2, isYou: false },
-    { id: 'liam', name: 'Liam', car: 'forest', avatar: '👱‍♂️', progress: 32, wpm: 115, rank: 3, isYou: false },
-    { id: 'sophia', name: 'Sophia', car: 'starter', avatar: '👧', progress: 26, wpm: 108, rank: 4, isYou: false }
-  ]);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const raceStartTimeRef = useRef<number>(Date.now());
 
   // Auto focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
-    setStartTime(Date.now());
+    raceStartTimeRef.current = Date.now();
   }, []);
 
-  // Timer & Opponent Loop
+  // Timer loop
   useEffect(() => {
     const timer = setInterval(() => {
       setElapsedSeconds(prev => prev + 1);
-
-      // Advance opponents smoothly
-      setOpponents(prev => prev.map(opp => {
-        const increment = (opp.wpm / 60) * 0.45;
-        const newProgress = Math.min(100, opp.progress + increment);
-        return { ...opp, progress: newProgress };
-      }));
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
+  const equippedItem = user?.inventory?.find(i => i.isEquipped);
+  const userCarId: CarModelId = (equippedItem?.itemId as CarModelId) || 'blaze';
+  const userNickname = user?.profile?.nickname || 'You';
+
   // Handle Keystrokes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFinishing) return;
     const val = e.target.value;
-    const targetSlice = passageText.slice(0, val.length);
+    const targetSlice = activePassage.slice(0, val.length);
 
     setTotalKeystrokes(prev => prev + 1);
 
@@ -71,30 +70,67 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
 
       // Compute Accuracy
       const currentAcc = Math.round(((correctKeystrokes + 1) / (totalKeystrokes + 1)) * 100);
-      setAccuracy(Math.min(100, Math.max(70, currentAcc)));
+      const normalizedAcc = Math.min(100, Math.max(50, currentAcc));
+      setAccuracy(normalizedAcc);
+
+      const userProg = (val.length / activePassage.length) * 100;
+      sendProgress(userProg, calculatedWpm, normalizedAcc);
 
       // Check if finished!
-      if (val.length === passageText.length) {
+      if (val.length >= activePassage.length) {
+        setIsFinishing(true);
+
+        // Calculate placement
+        const fasterOpponents = players.filter(p => p.userId !== user?.id && p.finished).length;
+        const finalPlace = fasterOpponents + 1;
+
+        try {
+          await submitFinalRace({
+            wpm: calculatedWpm,
+            accuracy: normalizedAcc,
+            durationSec: Math.max(1, elapsedSeconds),
+            place: finalPlace
+          });
+        } catch {
+          // Fallback
+        }
+
         setTimeout(() => {
-          onNavigate('screen-16'); // Race Results Celebration!
-        }, 600);
+          onNavigate('screen-16'); // Transition to podium celebration!
+        }, 500);
       }
     } else {
       setErrorIndex(val.length - 1);
     }
   };
 
-  const userProgress = (typedInput.length / passageText.length) * 100;
+  const userProgress = (typedInput.length / activePassage.length) * 100;
 
-  // Split passage text for visual highlight matching image 02
-  const typedWordCount = typedInput.trim().split(/\s+/).filter(Boolean).length;
-  const currentTypedPart = passageText.slice(0, typedInput.length);
-  const remainingPart = passageText.slice(typedInput.length);
+  // Split passage text for visual highlight
+  const currentTypedPart = activePassage.slice(0, typedInput.length);
+  const remainingPart = activePassage.slice(typedInput.length);
+
+  // Separate user and opponents
+  const opponentRacers = players.filter(p => p.userId !== user?.id && p.socketId !== p.userId);
+  const defaultOpponents = [
+    { socketId: 'opp_1', userId: 'opp_1', nickname: 'Emma', carId: 'golden', avatar: '👩‍🦰', progress: Math.min(95, elapsedSeconds * 3.8), wpm: 122, accuracy: 98, finished: false },
+    { socketId: 'opp_2', userId: 'opp_2', nickname: 'Liam', carId: 'forest', avatar: '👱‍♂️', progress: Math.min(90, elapsedSeconds * 3.2), wpm: 115, accuracy: 96, finished: false },
+    { socketId: 'opp_3', userId: 'opp_3', nickname: 'Sophia', carId: 'starter', avatar: '👧', progress: Math.min(85, elapsedSeconds * 2.8), wpm: 108, accuracy: 99, finished: false }
+  ];
+
+  const activeOpponents = opponentRacers.length > 0 ? opponentRacers : defaultOpponents;
 
   // Determine current position
   const allRacers = [
-    { name: 'You', isYou: true, progress: userProgress, avatar: '🏎️', rank: 1 },
-    ...opponents
+    { name: `${userNickname} (You)`, isYou: true, progress: userProgress, avatar: user?.profile?.avatarId || '🏎️', carId: userCarId, rank: 1 },
+    ...activeOpponents.map(opp => ({
+      name: opp.nickname,
+      isYou: false,
+      progress: opp.progress,
+      avatar: opp.avatar || '🏎️',
+      carId: (opp.carId as CarModelId) || 'starter',
+      rank: 2
+    }))
   ].sort((a, b) => b.progress - a.progress);
 
   const userRank = allRacers.findIndex(r => r.isYou) + 1;
@@ -103,11 +139,11 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
     <div className="screen-page live-race-screen" onClick={() => inputRef.current?.focus()}>
       <div className="content-wrapper race-canvas-wrapper">
         
-        {/* TOP PASSAGE & RACE BAR (Matching Reference Image 02) */}
+        {/* TOP PASSAGE & RACE BAR */}
         <div className="race-top-card card">
           <div className="passage-header-row">
             <div className="lap-counter-pill">
-              <span>{userRank}/4</span>
+              <span>Position: #{userRank} / {allRacers.length}</span>
             </div>
 
             {/* TYPING PASSAGE DISPLAY */}
@@ -147,14 +183,14 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
             className="race-track-bg-img"
           />
 
-          {/* Floating Player Rankings Panel (Right Side, matching reference image 02) */}
+          {/* Floating Player Rankings Panel (Right Side) */}
           <div className="floating-standings-card">
             {allRacers.map((racer, idx) => (
               <div 
                 key={racer.name} 
                 className={`standing-row ${racer.isYou ? 'standing-you' : ''}`}
               >
-                <span className="standing-rank">{idx + 1}</span>
+                <span className="standing-rank">#{idx + 1}</span>
                 <span className="standing-avatar">{racer.avatar}</span>
                 <span className="standing-name">{racer.name}</span>
                 {racer.isYou && <span className="standing-wpm">{wpm} WPM</span>}
@@ -164,53 +200,33 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
 
           {/* Dynamic 2D Lane Overlay with Animated Cars */}
           <div className="lanes-overlay-container">
-            {/* Lane 1: Player Car (Blaze Runner Red) */}
+            {/* Lane 1: Player Car */}
             <div className="lane-strip">
               <div 
                 className="lane-car-mover"
                 style={{ left: `${Math.min(88, Math.max(4, userProgress))}%` }}
               >
-                <div className="car-indicator-tag you">You</div>
-                <SvgCar id="blaze" size={135} animatedNitro={userProgress > 10} />
+                <div className="car-indicator-tag you">{userNickname}</div>
+                <SvgCar id={userCarId} size={135} animatedNitro={userProgress > 5} />
               </div>
             </div>
 
-            {/* Lane 2: Emma (Golden Flash) */}
-            <div className="lane-strip">
-              <div 
-                className="lane-car-mover"
-                style={{ left: `${Math.min(88, Math.max(4, opponents[0].progress))}%` }}
-              >
-                <div className="car-indicator-tag">Emma</div>
-                <SvgCar id="golden" size={135} />
+            {/* Opponent Lanes */}
+            {activeOpponents.slice(0, 3).map((opp, idx) => (
+              <div key={opp.socketId || idx} className="lane-strip">
+                <div 
+                  className="lane-car-mover"
+                  style={{ left: `${Math.min(88, Math.max(4, opp.progress))}%` }}
+                >
+                  <div className="car-indicator-tag">{opp.nickname}</div>
+                  <SvgCar id={(opp.carId as CarModelId) || 'golden'} size={135} animatedNitro={opp.progress > 5} />
+                </div>
               </div>
-            </div>
-
-            {/* Lane 3: Liam (Forest Beast) */}
-            <div className="lane-strip">
-              <div 
-                className="lane-car-mover"
-                style={{ left: `${Math.min(88, Math.max(4, opponents[1].progress))}%` }}
-              >
-                <div className="car-indicator-tag">Liam</div>
-                <SvgCar id="forest" size={135} />
-              </div>
-            </div>
-
-            {/* Lane 4: Sophia (Starter Car) */}
-            <div className="lane-strip">
-              <div 
-                className="lane-car-mover"
-                style={{ left: `${Math.min(88, Math.max(4, opponents[2].progress))}%` }}
-              >
-                <div className="car-indicator-tag">Sophia</div>
-                <SvgCar id="starter" size={135} />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* BOTTOM HUD OVERLAY (Matching Reference Image 02) */}
+        {/* BOTTOM HUD OVERLAY */}
         <div className="race-bottom-hud card card-dark">
           <div className="hud-left-stats">
             <div className="hud-trophy-icon">
@@ -218,74 +234,44 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
             </div>
             <div className="hud-metric-block">
               <div className="hud-wpm-text">
-                <span className="hud-wpm-number">{wpm}</span>
-                <span className="hud-wpm-label">WPM</span>
+                <span className="hud-wpm-num">{wpm}</span>
+                <span className="hud-wpm-unit">WPM</span>
               </div>
-              <span className="hud-accuracy-text">{accuracy}% Accuracy</span>
+              <div className="hud-sub-label">Current Net Velocity</div>
+            </div>
+
+            <div className="hud-divider" />
+
+            <div className="hud-metric-block">
+              <div className="hud-acc-text text-green">{accuracy}%</div>
+              <div className="hud-sub-label">Keystroke Accuracy</div>
+            </div>
+
+            <div className="hud-divider" />
+
+            <div className="hud-metric-block">
+              <div className="hud-progress-text text-orange">{Math.round(userProgress)}%</div>
+              <div className="hud-sub-label">Highway Progress</div>
             </div>
           </div>
 
-          {/* Center Progress Bar */}
-          <div className="hud-center-track">
-            <button 
-              className="nitro-hud-btn"
-              onClick={() => {
-                setWpm(prev => prev + 15);
-              }}
-              title="Nitro Active"
-            >
-              <Zap size={18} fill="#38BDF8" className="text-blue" />
-            </button>
-
-            <div className="hud-progress-groove">
-              <div 
-                className="hud-progress-fill" 
-                style={{ width: `${userProgress}%` }}
-              />
-              <div 
-                className="hud-car-marker"
-                style={{ left: `${userProgress}%` }}
-              >
-                🏎️
-              </div>
-              <div className="hud-finish-flag">
-                🏁
-              </div>
-            </div>
-          </div>
-
-          {/* Sound & Controls */}
           <div className="hud-right-actions">
             <button 
-              className="hud-action-icon"
+              className="btn btn-secondary btn-sm"
               onClick={() => setSoundEnabled(!soundEnabled)}
-              title={soundEnabled ? "Mute Game Audio" : "Unmute Audio"}
+              title={soundEnabled ? 'Mute SFX' : 'Enable SFX'}
             >
-              {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              <span>{soundEnabled ? 'Engine SFX On' : 'Muted'}</span>
             </button>
 
             <button 
-              className="btn btn-primary btn-sm hud-finish-test-btn"
+              className="btn btn-outline btn-sm"
               onClick={() => onNavigate('screen-16')}
             >
-              Finish Race
-            </button>
-
-            <button 
-              className="hud-quit-btn"
-              onClick={() => onNavigate('screen-10')}
-              title="Leave Match"
-            >
-              ✕
+              <span>Finish Test (Screen 16)</span>
             </button>
           </div>
-        </div>
-
-        {/* Keyboard Focus Prompt */}
-        <div className="typing-guide-helper text-center mt-2">
-          <p className="text-xs text-secondary">
-            💡 <strong>Keyboard Active:</strong> Type the passage on your keyboard to advance your car forward in Lane 1!
-          </p>
         </div>
 
       </div>

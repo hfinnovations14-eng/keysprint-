@@ -4,6 +4,7 @@ import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { CarModelId } from './components/common/SvgCar';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { RaceProvider } from './context/RaceContext';
 
 // PUBLIC SCREENS
 import { Screen01Homepage } from './screens/public/Screen01Homepage';
@@ -296,7 +297,9 @@ const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <RaceProvider>
+        <AppContent />
+      </RaceProvider>
     </AuthProvider>
   );
 };
