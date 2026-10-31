@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { Sliders, Save, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export const Admin04GameConfig: React.FC = () => {

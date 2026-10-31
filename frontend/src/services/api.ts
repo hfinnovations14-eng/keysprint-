@@ -84,7 +84,13 @@ export const api = {
   // Admin
   getAdminMetrics: () => request('/admin/metrics'),
   getAdminUsers: () => request('/admin/users'),
+  updateUserStatus: (userId: string, status?: string, role?: string) =>
+    request(`/admin/users/${userId}/status`, { method: 'PUT', body: JSON.stringify({ status, role }) }),
   getAdminPassages: () => request('/admin/passages'),
   createAdminPassage: (passage: { text: string; difficulty: string; category: string }) =>
     request('/admin/passages', { method: 'POST', body: JSON.stringify(passage) }),
+  retireAdminPassage: (passageId: string) =>
+    request(`/admin/passages/${passageId}/retire`, { method: 'PUT' }),
+  getAdminAntiCheat: () => request('/admin/anticheat'),
+  getAdminAuditLogs: () => request('/admin/audit'),
 };

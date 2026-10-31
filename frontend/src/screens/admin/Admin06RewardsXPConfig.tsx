@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { Trophy, Star, Coins, Gift, Save } from 'lucide-react';
 
 export const Admin06RewardsXPConfig: React.FC = () => {

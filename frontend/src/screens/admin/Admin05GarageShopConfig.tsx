@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { Warehouse, Plus, Edit2, Coins, Check } from 'lucide-react';
 import { CARS_DATA, CarItem } from '../../data/carsData';
 import { SvgCar } from '../../components/common/SvgCar';

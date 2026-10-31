@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { TrendingUp, Users, Smartphone, Monitor, Globe } from 'lucide-react';
 
 export const Admin08Analytics: React.FC = () => {

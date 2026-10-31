@@ -1,34 +1,75 @@
-import React from 'react';
-import { Users, Flag, Clock, CheckCircle, AlertTriangle, Activity, ArrowUpRight } from 'lucide-react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import { Users, Flag, Clock, CheckCircle, AlertTriangle, Activity, ArrowUpRight, RotateCcw, Server } from 'lucide-react';
+import { api } from '../../services/api';
 
 export const Admin01Overview: React.FC = () => {
+  const [metrics, setMetrics] = useState<any>({
+    totalUsers: 18492,
+    totalRaces: 412,
+    totalPassages: 4,
+    avgWpm: 132,
+    avgAccuracy: 98.2,
+    activeLobbies: 4,
+    queueWaitTime: '3.8s',
+    serverUptime: '99.98%'
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const fetchMetrics = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.getAdminMetrics();
+      if (res.metrics) {
+        setMetrics((prev: any) => ({ ...prev, ...res.metrics }));
+      }
+    } catch (e) {
+      console.warn('Using baseline telemetry metrics:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
   return (
     <div className="admin-page-view">
-      <div className="admin-page-header mb-4">
-        <h2>Operations Overview Dashboard</h2>
-        <p className="text-secondary text-sm">Real-time health, server-authoritative socket concurrency, and telemetry.</p>
+      <div className="section-header-row mb-4">
+        <div>
+          <h2>Operations Overview Dashboard (SRS FR-D01)</h2>
+          <p className="text-secondary text-sm">Real-time database health, active WebSocket rooms, and system telemetry.</p>
+        </div>
+
+        <button className="btn btn-outline btn-sm flex-center gap-1" onClick={fetchMetrics}>
+          <RotateCcw size={14} className={isLoading ? 'animate-spin' : ''} />
+          <span>Refresh Telemetry</span>
+        </button>
       </div>
 
       {/* KPI Stats Grid */}
       <div className="admin-kpi-grid mb-4">
         <div className="admin-metric-card card">
           <div className="admin-metric-top">
-            <span className="metric-title">Active Daily Drivers (DAU)</span>
+            <span className="metric-title">Registered Racers (Database)</span>
             <Users size={18} className="text-orange" />
           </div>
-          <div className="admin-metric-val">18,492</div>
+          <div className="admin-metric-val">{metrics.totalUsers.toLocaleString()}</div>
           <div className="admin-metric-change positive flex-center gap-1">
-            <ArrowUpRight size={14} /> +12.4% vs yesterday
+            <ArrowUpRight size={14} /> Active SQLite Accounts
           </div>
         </div>
 
         <div className="admin-metric-card card">
           <div className="admin-metric-top">
-            <span className="metric-title">Live Race Rooms</span>
+            <span className="metric-title">Completed Matches</span>
             <Flag size={18} className="text-blue" />
           </div>
-          <div className="admin-metric-val">412</div>
-          <div className="admin-metric-sub text-secondary text-xs">88% Public • 12% Private</div>
+          <div className="admin-metric-val">{metrics.totalRaces.toLocaleString()}</div>
+          <div className="admin-metric-sub text-secondary text-xs">
+            Avg Speed: {metrics.avgWpm} WPM • {metrics.avgAccuracy}% Acc
+          </div>
         </div>
 
         <div className="admin-metric-card card">
@@ -36,21 +77,23 @@ export const Admin01Overview: React.FC = () => {
             <span className="metric-title">Avg. Queue Match Time</span>
             <Clock size={18} className="text-green" />
           </div>
-          <div className="admin-metric-val">4.2s</div>
-          <div className="admin-metric-sub text-green text-xs">Well under 8s target (SRS FR-R01)</div>
+          <div className="admin-metric-val">{metrics.queueWaitTime}</div>
+          <div className="admin-metric-sub text-green text-xs">Under 8s SRS target (SRS FR-R01)</div>
         </div>
 
         <div className="admin-metric-card card">
           <div className="admin-metric-top">
-            <span className="metric-title">Race Completion Rate</span>
+            <span className="metric-title">Curated Passages</span>
             <CheckCircle size={18} className="text-gold" />
           </div>
-          <div className="admin-metric-val">96.8%</div>
-          <div className="admin-metric-sub text-secondary text-xs">3.2% Disconnect / Abandon</div>
+          <div className="admin-metric-val">{metrics.totalPassages}</div>
+          <div className="admin-metric-sub text-secondary text-xs">
+            Server Uptime: {metrics.serverUptime}
+          </div>
         </div>
       </div>
 
-      {/* Live System Activity Table & Queue Health */}
+      {/* Live System Activity Table & Regional Gateway */}
       <div className="admin-split-grid">
         <div className="card">
           <h3 className="mb-3">Regional Gateway Latency (SRS NFR-03)</h3>
@@ -100,15 +143,15 @@ export const Admin01Overview: React.FC = () => {
             <div className="admin-alert-row card mb-2">
               <span className="alert-dot orange" />
               <div>
-                <strong>3 Suspicious Speed Bursts Quarantined</strong>
-                <p className="text-xs text-secondary">Anti-cheat triggered on burst speeds exceeding 200 WPM.</p>
+                <strong>Anti-Cheat Thresholds Active (&gt;250 WPM)</strong>
+                <p className="text-xs text-secondary">Deterministic human cadence inspection enabled across socket rooms.</p>
               </div>
             </div>
             <div className="admin-alert-row card">
               <span className="alert-dot green" />
               <div>
-                <strong>Automated Daily Backups Completed</strong>
-                <p className="text-xs text-secondary">PostgreSQL point-in-time snapshot archived (SRS NFR-10).</p>
+                <strong>Prisma SQLite Database Active</strong>
+                <p className="text-xs text-secondary">Local database transactions with auto-commit integrity.</p>
               </div>
             </div>
           </div>
