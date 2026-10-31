@@ -15,6 +15,7 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   updateCoins: (coins: number) => void;
   equipCar: (carId: string) => Promise<void>;
+  purchaseCar: (carId: string, cost: number) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: { nickname?: string; avatarId?: string; countryCode?: string; bio?: string }) => Promise<void>;
 }
 
@@ -123,6 +124,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     });
   };
 
+  const purchaseCar = async (carId: string, cost: number): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await api.purchaseStoreItem(carId, cost, 'car');
+      if (res.item) {
+        setUser(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            stats: {
+              ...prev.stats,
+              coins: res.coins
+            },
+            inventory: [...prev.inventory, res.item]
+          };
+        });
+        return { success: true };
+      }
+      return { success: false, error: 'Failed to process purchase' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Purchase error' };
+    }
+  };
+
   const updateProfile = async (data: { nickname?: string; avatarId?: string; countryCode?: string; bio?: string }) => {
     const res = await api.updateProfile(data);
     if (res.profile) {
@@ -153,6 +177,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
         refreshUser,
         updateCoins,
         equipCar,
+        purchaseCar,
         updateProfile
       }}
     >

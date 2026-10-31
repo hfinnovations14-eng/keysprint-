@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Sparkles, Coins, ChevronRight, Check, Zap, Flame } from 'lucide-react';
+import * as React from 'react';
+import { useState } from 'react';
+import { ShoppingBag, Sparkles, Coins, ChevronRight, Check, Zap, Flame, ShieldCheck } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { Screen26PurchaseModal } from './Screen26PurchaseModal';
+import { CARS_DATA, CarItem } from '../../data/carsData';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen25ShopProps {
   onNavigate: (screenId: string) => void;
@@ -11,22 +14,40 @@ interface Screen25ShopProps {
 
 export const Screen25Shop: React.FC<Screen25ShopProps> = ({ 
   onNavigate,
-  coins = 2450,
+  coins: propCoins,
   onPurchaseItem 
-}) => {
+}: Screen25ShopProps) => {
+  const { user, purchaseCar, equipCar } = useAuth();
   const [activeTab, setActiveTab] = useState<'Cars' | 'Wheels' | 'Trails' | 'Effects' | 'Bundles'>('Cars');
   const [selectedItemForPurchase, setSelectedItemForPurchase] = useState<any | null>(null);
 
-  const shopCars = [
-    { id: 'starter', name: 'Thunder X', price: 1200, category: 'Rare', carId: 'starter', desc: 'Electric blue aerodynamic chassis with high-intensity headlights.' },
-    { id: 'ice', name: 'Sky Racer', price: 1500, category: 'Rare', carId: 'ice', desc: 'Frost cyan body tuned for sharp drift responsiveness.' },
-    { id: 'shadow', name: 'Phantom', price: 1800, category: 'Epic', carId: 'shadow', desc: 'Stealth black exterior with crimson underglow.' },
-    { id: 'blaze', name: 'Lava Speed', price: 2000, category: 'Epic', carId: 'blaze', desc: 'Fiery red track monster with dual racing stripes.' },
-  ];
+  const liveCoins = user?.stats?.coins ?? propCoins ?? 2450;
+
+  const isCarOwned = (carId: string) => {
+    if (carId === 'starter') return true;
+    return !!user?.inventory?.some(i => i.itemId === carId);
+  };
+
+  const isCarEquipped = (carId: string) => {
+    return !!user?.inventory?.some(i => i.itemId === carId && i.isEquipped);
+  };
 
   const handleOpenPurchase = (item: any) => {
     setSelectedItemForPurchase(item);
   };
+
+  const handleConfirmPurchase = async (cost: number) => {
+    if (!selectedItemForPurchase) return;
+    const carId = selectedItemForPurchase.carId || selectedItemForPurchase.id;
+    await purchaseCar(carId, cost);
+    if (onPurchaseItem) onPurchaseItem(cost);
+  };
+
+  const cosmeticTrails = [
+    { id: 'trail-nitro-cyan', name: 'Frostbite Vapor Trail', price: 600, category: 'Rare', type: 'trail', desc: 'Sub-zero cryo vapor streaming behind your rear spoilers.' },
+    { id: 'trail-solar-gold', name: 'Hypernova Golden Flare', price: 900, category: 'Epic', type: 'trail', desc: 'Solar ionization particle burst tailored for championship sprint runs.' },
+    { id: 'trail-void-purple', name: 'Singularity Drift Smoke', price: 1200, category: 'Legendary', type: 'trail', desc: 'Dimensional violet energy that pulsates with every keystroke combo.' }
+  ];
 
   return (
     <div className="screen-page shop-screen">
@@ -37,14 +58,14 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
           <div>
             <span className="badge badge-orange">Cosmetic Showroom</span>
             <h1 className="page-title">KeySprint Shop</h1>
-            <p className="page-subtitle">Spend virtual coins earned by racing. No real-money transactions.</p>
+            <p className="page-subtitle">Spend virtual coins earned by racing. No real-money pay-to-win.</p>
           </div>
 
           <div className="shop-balance-badge card-cream">
             <Coins size={22} className="text-gold" />
             <div>
               <span className="balance-label">Your Coin Balance</span>
-              <span className="balance-amount">{coins.toLocaleString()} 🪙</span>
+              <span className="balance-amount">{liveCoins.toLocaleString()} 🪙</span>
             </div>
           </div>
         </div>
@@ -75,7 +96,7 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
             <span className="bundle-pill">SPECIAL BUNDLE</span>
             <h2 className="bundle-title">Racing Legend Pack</h2>
             <p className="bundle-desc">
-              Unlock 3 Legendary Vehicles (Thunder, Blaze, Golden Flash) + Exclusive Ultraviolet Trails!
+              Unlock 3 Legendary Vehicles (Blaze, Golden Flash, Shadow X) + Exclusive Ultraviolet Stadium Trails!
             </p>
             <div className="bundle-cta-row mt-3">
               <button 
@@ -85,7 +106,7 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
                   price: 3500,
                   category: 'Legendary',
                   carId: 'golden',
-                  desc: 'Includes 3 top tier cartoon cars and special stadium trail effects.'
+                  desc: 'Includes 3 top tier motorsport cars and special stadium trail effects.'
                 })}
               >
                 <span>Get Bundle • 🪙 3,500</span>
@@ -95,62 +116,153 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
         </div>
 
         {/* FEATURED CARS (Matching Reference Image 08) */}
-        <div className="shop-featured-section">
-          <div className="section-header-row mb-3">
-            <div>
-              <span className="badge badge-orange">Individual Vehicles</span>
-              <h2>Featured Cars</h2>
+        {activeTab === 'Cars' && (
+          <div className="shop-featured-section">
+            <div className="section-header-row mb-3">
+              <div>
+                <span className="badge badge-orange">Vehicle Fleet</span>
+                <h2>Performance Sports Cars</h2>
+              </div>
+              <button 
+                className="link-bold flex-center gap-1"
+                onClick={() => onNavigate('screen-24')}
+              >
+                <span>Go to Garage</span>
+                <ChevronRight size={16} />
+              </button>
             </div>
-            <button className="link-bold flex-center gap-1">
-              <span>View All</span>
-              <ChevronRight size={16} />
-            </button>
-          </div>
 
-          <div className="shop-cars-grid">
-            {shopCars.map((item) => (
-              <div key={item.id} className="shop-item-card card">
-                <div className="card-top-tags">
-                  <span className={`badge badge-${item.category.toLowerCase()}`}>{item.category}</span>
-                </div>
+            <div className="shop-cars-grid">
+              {CARS_DATA.map((item) => {
+                const owned = isCarOwned(item.id);
+                const equipped = isCarEquipped(item.id);
 
-                <div className="shop-item-car">
-                  <SvgCar id={item.carId as any} size={150} />
-                </div>
-
-                <div className="shop-item-body">
-                  <h4>{item.name}</h4>
-                  <p className="shop-item-desc text-xs text-secondary">{item.desc}</p>
-                  
-                  <div className="shop-item-footer mt-3">
-                    <div className="price-tag">
-                      <Coins size={16} className="text-gold" />
-                      <span>{item.price.toLocaleString()}</span>
+                return (
+                  <div key={item.id} className="shop-item-card card">
+                    <div className="card-top-tags">
+                      <span className={`badge badge-${item.category.toLowerCase()}`}>{item.category}</span>
+                      {equipped ? (
+                        <span className="badge badge-green">Equipped</span>
+                      ) : owned ? (
+                        <span className="badge badge-blue">Owned</span>
+                      ) : null}
                     </div>
 
-                    <button 
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleOpenPurchase(item)}
-                    >
-                      Buy Now
-                    </button>
+                    <div className="shop-item-car">
+                      <SvgCar id={item.id} size={150} />
+                    </div>
+
+                    <div className="shop-item-body">
+                      <h4>{item.name}</h4>
+                      <p className="shop-item-desc text-xs text-secondary">{item.description}</p>
+                      
+                      <div className="shop-item-footer mt-3">
+                        <div className="price-tag">
+                          <Coins size={16} className="text-gold" />
+                          <span>{item.price === 0 ? 'Free Starter' : item.price.toLocaleString()}</span>
+                        </div>
+
+                        {equipped ? (
+                          <span className="status-equipped-text">✓ Active Ride</span>
+                        ) : owned ? (
+                          <button 
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => equipCar(item.id)}
+                          >
+                            Equip Now
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleOpenPurchase({
+                              ...item,
+                              carId: item.id,
+                              desc: item.description
+                            })}
+                          >
+                            Buy Now
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TRAILS / COSMETICS TAB */}
+        {activeTab === 'Trails' && (
+          <div className="shop-featured-section">
+            <div className="section-header-row mb-3">
+              <div>
+                <span className="badge badge-orange">Exhaust Aerodynamics</span>
+                <h2>Nitro Trails</h2>
+              </div>
+            </div>
+
+            <div className="shop-cars-grid">
+              {cosmeticTrails.map((item) => (
+                <div key={item.id} className="shop-item-card card">
+                  <div className="card-top-tags">
+                    <span className={`badge badge-${item.category.toLowerCase()}`}>{item.category}</span>
+                  </div>
+                  <div className="shop-item-car flex-center py-4">
+                    <Flame size={64} className="text-orange" />
+                  </div>
+                  <div className="shop-item-body">
+                    <h4>{item.name}</h4>
+                    <p className="shop-item-desc text-xs text-secondary">{item.desc}</p>
+                    <div className="shop-item-footer mt-3">
+                      <div className="price-tag">
+                        <Coins size={16} className="text-gold" />
+                        <span>{item.price.toLocaleString()}</span>
+                      </div>
+                      <button 
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleOpenPurchase({
+                          name: item.name,
+                          price: item.price,
+                          category: item.category,
+                          desc: item.desc,
+                          carId: 'blaze'
+                        })}
+                      >
+                        Buy Now
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* OTHER TABS FALLBACK */}
+        {(activeTab === 'Wheels' || activeTab === 'Effects' || activeTab === 'Bundles') && (
+          <div className="card card-cream text-center py-5">
+            <Sparkles size={48} className="text-gold mb-2 mx-auto" />
+            <h3>Fresh Stock Arriving in Next Grand Prix Drop</h3>
+            <p className="text-secondary max-w-md mx-auto mt-2">
+              New aerodynamic wheel spokes, custom underglow neon patterns, and sound horns will be unlocked in Season 2.
+            </p>
+            <button 
+              className="btn btn-primary mt-4"
+              onClick={() => setActiveTab('Cars')}
+            >
+              Browse Available Cars
+            </button>
+          </div>
+        )}
 
         {/* PURCHASE CONFIRMATION MODAL */}
         {selectedItemForPurchase && (
           <Screen26PurchaseModal
             item={selectedItemForPurchase}
-            userCoins={coins}
+            userCoins={liveCoins}
             onClose={() => setSelectedItemForPurchase(null)}
-            onConfirm={(cost) => {
-              if (onPurchaseItem) onPurchaseItem(cost);
-              setSelectedItemForPurchase(null);
-            }}
+            onConfirm={handleConfirmPurchase}
           />
         )}
 

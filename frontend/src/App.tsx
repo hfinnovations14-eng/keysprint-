@@ -79,7 +79,7 @@ import { ScreenResponsiveViews } from './screens/responsive/ScreenResponsiveView
 import { ScreenOverviewBoard } from './screens/overview/ScreenOverviewBoard';
 
 const AppContent: React.FC = () => {
-  const { user, updateCoins, equipCar } = useAuth();
+  const { user, updateCoins, equipCar, purchaseCar } = useAuth();
   const [currentScreenId, setCurrentScreenId] = useState<string>('screen-01');
   const [viewport, setViewport] = useState<ViewportMode>('desktop');
 
@@ -204,7 +204,10 @@ const AppContent: React.FC = () => {
               }}
               userCoins={liveCoins}
               onClose={() => setCurrentScreenId('screen-25')}
-              onConfirm={handlePurchaseItem}
+              onConfirm={async (cost: number) => {
+                await purchaseCar('golden', cost);
+                setCurrentScreenId('screen-24');
+              }}
             />
           </div>
         );

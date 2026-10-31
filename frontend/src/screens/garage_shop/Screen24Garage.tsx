@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { Warehouse, Check, Sparkles, SlidersHorizontal, Palette, Flame, Shield } from 'lucide-react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import { Warehouse, Check, Sparkles, SlidersHorizontal, Palette, Flame, Shield, Coins } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { CARS_DATA, CarItem } from '../../data/carsData';
+import { useAuth } from '../../context/AuthContext';
+import { Screen26PurchaseModal } from './Screen26PurchaseModal';
 
 interface Screen24GarageProps {
   onNavigate: (screenId: string) => void;
@@ -13,22 +16,49 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
   onNavigate,
   equippedCarId = 'blaze',
   onEquipCar 
-}) => {
+}: Screen24GarageProps) => {
+  const { user, equipCar, purchaseCar } = useAuth();
   const [activeCategory, setActiveCategory] = useState<'All' | 'Common' | 'Rare' | 'Epic' | 'Legendary'>('All');
-  const [currentEquipped, setCurrentEquipped] = useState<CarModelId>(equippedCarId);
+  
+  const userEquipped = (user?.inventory?.find(i => i.isEquipped)?.itemId as CarModelId) || equippedCarId;
+  const [currentEquipped, setCurrentEquipped] = useState<CarModelId>(userEquipped);
   const [selectedPreview, setSelectedPreview] = useState<CarItem>(
-    CARS_DATA.find(c => c.id === equippedCarId) || CARS_DATA[0]
+    CARS_DATA.find(c => c.id === userEquipped) || CARS_DATA[0]
   );
+  const [selectedItemForPurchase, setSelectedItemForPurchase] = useState<CarItem | null>(null);
+
+  useEffect(() => {
+    if (user?.inventory) {
+      const eq = user.inventory.find(i => i.isEquipped)?.itemId as CarModelId;
+      if (eq) {
+        setCurrentEquipped(eq);
+      }
+    }
+  }, [user?.inventory]);
+
+  const isCarOwned = (carId: string): boolean => {
+    if (carId === 'starter') return true;
+    return !!user?.inventory?.some(i => i.itemId === carId);
+  };
 
   const filteredCars = activeCategory === 'All' 
     ? CARS_DATA 
     : CARS_DATA.filter(c => c.category === activeCategory);
 
-  const handleEquip = (car: CarItem) => {
+  const handleEquip = async (car: CarItem) => {
     setCurrentEquipped(car.id);
     setSelectedPreview(car);
     if (onEquipCar) onEquipCar(car.id);
+    await equipCar(car.id);
   };
+
+  const handleConfirmPurchase = async (cost: number) => {
+    if (!selectedItemForPurchase) return;
+    await purchaseCar(selectedItemForPurchase.id, cost);
+    setSelectedItemForPurchase(null);
+  };
+
+  const userCoins = user?.stats?.coins ?? 2450;
 
   return (
     <div className="screen-page garage-screen">
@@ -70,7 +100,7 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                 <span className="badge badge-green flex-center gap-1">
                   <Check size={14} /> Currently Equipped
                 </span>
-              ) : selectedPreview.owned ? (
+              ) : isCarOwned(selectedPreview.id) ? (
                 <span className="badge badge-blue">Owned in Garage</span>
               ) : (
                 <span className="badge badge-gold">Available in Shop (🪙 {selectedPreview.price})</span>
@@ -101,7 +131,7 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                   <Check size={16} />
                   <span>Equipped as Active Racer</span>
                 </button>
-              ) : selectedPreview.owned ? (
+              ) : isCarOwned(selectedPreview.id) ? (
                 <button 
                   className="btn btn-primary btn-lg"
                   onClick={() => handleEquip(selectedPreview)}
@@ -112,8 +142,9 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
               ) : (
                 <button 
                   className="btn btn-gold btn-lg"
-                  onClick={() => onNavigate('screen-25')}
+                  onClick={() => setSelectedItemForPurchase(selectedPreview)}
                 >
+                  <Coins size={18} />
                   <span>Unlock in Shop (🪙 {selectedPreview.price})</span>
                 </button>
               )}
@@ -126,6 +157,7 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
           {filteredCars.map((car) => {
             const isEquipped = currentEquipped === car.id;
             const isSelected = selectedPreview.id === car.id;
+            const owned = isCarOwned(car.id);
 
             return (
               <div 
@@ -137,6 +169,9 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                   <span className={`badge badge-${car.category.toLowerCase()}`}>{car.category}</span>
                   {isEquipped && (
                     <span className="equipped-pill">Equipped</span>
+                  )}
+                  {!isEquipped && owned && (
+                    <span className="badge badge-blue">Owned</span>
                   )}
                 </div>
 
@@ -154,7 +189,7 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                   <div className="card-action-btn-row mt-3">
                     {isEquipped ? (
                       <span className="status-equipped-text">✓ Active Ride</span>
-                    ) : car.owned ? (
+                    ) : owned ? (
                       <button 
                         className="btn btn-primary btn-sm full-width"
                         onClick={(e) => {
@@ -169,7 +204,7 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                         className="btn btn-outline btn-sm full-width"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onNavigate('screen-25');
+                          setSelectedItemForPurchase(car);
                         }}
                       >
                         🪙 {car.price}
@@ -181,6 +216,22 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
             );
           })}
         </div>
+
+        {/* PURCHASE CONFIRMATION MODAL IF UNLOCKED FROM GARAGE */}
+        {selectedItemForPurchase && (
+          <Screen26PurchaseModal
+            item={{
+              name: selectedItemForPurchase.name,
+              price: selectedItemForPurchase.price,
+              category: selectedItemForPurchase.category,
+              carId: selectedItemForPurchase.id,
+              desc: selectedItemForPurchase.description
+            }}
+            userCoins={userCoins}
+            onClose={() => setSelectedItemForPurchase(null)}
+            onConfirm={handleConfirmPurchase}
+          />
+        )}
 
       </div>
     </div>

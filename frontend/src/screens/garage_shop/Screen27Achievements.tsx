@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { Trophy, CheckCircle, Lock, Flame, Star, Coins } from 'lucide-react';
 import { ACHIEVEMENTS_DATA } from '../../data/mockData';
 
@@ -6,7 +7,9 @@ interface Screen27AchievementsProps {
   onNavigate: (screenId: string) => void;
 }
 
-export const Screen27Achievements: React.FC<Screen27AchievementsProps> = ({ onNavigate }) => {
+export const Screen27Achievements: React.FC<Screen27AchievementsProps> = ({ 
+  onNavigate 
+}: Screen27AchievementsProps) => {
   const [filter, setFilter] = useState<'All' | 'In Progress' | 'Completed' | 'Locked'>('All');
 
   const filteredAchievements = filter === 'All'

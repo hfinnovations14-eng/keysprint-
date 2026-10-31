@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { Clock, CheckCircle2, Gift, Star, Coins, Zap } from 'lucide-react';
 import { DAILY_CHALLENGES } from '../../data/mockData';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen28DailyChallengesProps {
   onNavigate: (screenId: string) => void;
@@ -10,11 +12,14 @@ interface Screen28DailyChallengesProps {
 export const Screen28DailyChallenges: React.FC<Screen28DailyChallengesProps> = ({ 
   onNavigate,
   onClaimReward 
-}) => {
+}: Screen28DailyChallengesProps) => {
+  const { user, updateCoins } = useAuth();
   const [challenges, setChallenges] = useState(DAILY_CHALLENGES);
 
   const handleClaim = (id: string, coins: number, xp: number) => {
     setChallenges(prev => prev.map(c => c.id === id ? { ...c, claimed: true } : c));
+    const currentCoins = user?.stats?.coins ?? 2500;
+    updateCoins(currentCoins + coins);
     if (onClaimReward) onClaimReward(coins, xp);
   };
 
@@ -58,33 +63,33 @@ export const Screen28DailyChallenges: React.FC<Screen28DailyChallengesProps> = (
                   <div className="c-progress-row mt-2">
                     <div className="c-progress-track">
                       <div 
-                        className="c-progress-fill" 
+                        className="c-progress-bar"
                         style={{ width: `${(c.progress / c.max) * 100}%` }}
                       />
                     </div>
-                    <span className="c-progress-text">{c.progress} / {c.max}</span>
+                    <span className="c-count-text">
+                      <strong>{c.progress}</strong> / {c.max}
+                    </span>
                   </div>
                 </div>
 
                 <div className="c-action-wrap">
                   {c.claimed ? (
-                    <span className="badge badge-secondary flex-center gap-1">
-                      <CheckCircle2 size={14} className="text-green" /> Claimed
-                    </span>
+                    <button className="btn btn-secondary btn-sm" disabled>
+                      <CheckCircle2 size={16} className="text-green" />
+                      <span>Claimed</span>
+                    </button>
                   ) : c.completed ? (
                     <button 
-                      className="btn btn-primary btn-sm"
+                      className="btn btn-primary btn-sm btn-pulse"
                       onClick={() => handleClaim(c.id, c.coinReward, c.xpReward)}
                     >
-                      <Gift size={15} />
-                      <span>Claim</span>
+                      <Gift size={16} />
+                      <span>Claim Reward</span>
                     </button>
                   ) : (
-                    <button 
-                      className="btn btn-outline btn-sm"
-                      onClick={() => onNavigate('screen-10')}
-                    >
-                      Race Now
+                    <button className="btn btn-secondary btn-sm" disabled>
+                      <span>In Progress</span>
                     </button>
                   )}
                 </div>
