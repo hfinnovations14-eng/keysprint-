@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { getSocket, connectSocket, disconnectSocket } from '../services/socket';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -45,7 +46,7 @@ const DEFAULT_PASSAGE = "The quick brown fox jumps over the lazy dog while sport
 
 const RaceContext = createContext<RaceContextType | undefined>(undefined);
 
-export const RaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { children: ReactNode }) => {
   const { user, refreshUser } = useAuth();
   const [roomId, setRoomId] = useState<string | null>(null);
   const [passageText, setPassageText] = useState<string>(DEFAULT_PASSAGE);

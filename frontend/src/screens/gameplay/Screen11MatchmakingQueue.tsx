@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
+import { useEffect } from 'react';
 import { Loader2, X, ShieldCheck, MapPin, Zap } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { useRace } from '../../context/RaceContext';
@@ -8,7 +9,7 @@ interface Screen11MatchmakingQueueProps {
   onNavigate: (screenId: string) => void;
 }
 
-export const Screen11MatchmakingQueue: React.FC<Screen11MatchmakingQueueProps> = ({ onNavigate }) => {
+export const Screen11MatchmakingQueue: React.FC<Screen11MatchmakingQueueProps> = ({ onNavigate }: Screen11MatchmakingQueueProps) => {
   const { user } = useAuth();
   const { roomId, roomStatus, players, countdown, joinMatchmaking, leaveMatchmaking } = useRace();
 

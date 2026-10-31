@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { ScreenSwitcherToolbar, ViewportMode, SCREEN_INVENTORY } from './components/layout/ScreenSwitcherToolbar';
 import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
@@ -101,7 +102,7 @@ const AppContent: React.FC = () => {
       return (
         <AdminLayout
           currentAdminId={currentScreenId}
-          onNavigateAdmin={(id) => setCurrentScreenId(id)}
+          onNavigateAdmin={(id: string) => setCurrentScreenId(id)}
           onExitAdmin={() => setCurrentScreenId('screen-01')}
         >
           {currentScreenId === 'admin-01' && <Admin01Overview />}
@@ -179,7 +180,7 @@ const AppContent: React.FC = () => {
           <Screen24Garage 
             onNavigate={setCurrentScreenId}
             equippedCarId={liveEquippedCar}
-            onEquipCar={(id) => equipCar(id)}
+            onEquipCar={(id: CarModelId) => equipCar(id)}
           />
         );
       case 'screen-25':
@@ -213,7 +214,7 @@ const AppContent: React.FC = () => {
         return (
           <Screen28DailyChallenges 
             onNavigate={setCurrentScreenId}
-            onClaimReward={(c) => updateCoins(liveCoins + c)}
+            onClaimReward={(c: number) => updateCoins(liveCoins + c)}
           />
         );
 

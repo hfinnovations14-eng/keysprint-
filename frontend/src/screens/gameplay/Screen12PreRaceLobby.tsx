@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { Flag, ShieldCheck, MapPin, Sparkles } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { useRace } from '../../context/RaceContext';
@@ -8,7 +9,7 @@ interface Screen12PreRaceLobbyProps {
   onNavigate: (screenId: string) => void;
 }
 
-export const Screen12PreRaceLobby: React.FC<Screen12PreRaceLobbyProps> = ({ onNavigate }) => {
+export const Screen12PreRaceLobby: React.FC<Screen12PreRaceLobbyProps> = ({ onNavigate }: Screen12PreRaceLobbyProps) => {
   const { user } = useAuth();
   const { players, roomId } = useRace();
   const [countdown, setCountdown] = useState(3);

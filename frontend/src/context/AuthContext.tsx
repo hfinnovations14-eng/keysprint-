@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { CurrentUser } from '../types';
 import { api, getAuthToken, setAuthToken, clearAuthToken } from '../services/api';
 
@@ -19,7 +20,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [token, setTokenState] = useState<string | null>(getAuthToken());
   const [isLoading, setIsLoading] = useState<boolean>(true);

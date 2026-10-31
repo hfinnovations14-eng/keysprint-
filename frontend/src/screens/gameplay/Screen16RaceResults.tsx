@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
+import { useEffect } from 'react';
 import { Trophy, Zap, Clock, Coins, Star, RotateCcw, Share2, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useRace } from '../../context/RaceContext';
@@ -20,7 +21,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
   time: propTime,
   coinsEarned: propCoins,
   xpEarned: propXp
-}) => {
+}: Screen16RaceResultsProps) => {
   const { user } = useAuth();
   const { lastResult, joinMatchmaking } = useRace();
 

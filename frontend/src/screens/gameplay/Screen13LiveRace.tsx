@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Trophy, Volume2, VolumeX, Eye, Flag, Zap, RotateCcw, AlertTriangle } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { useRace } from '../../context/RaceContext';
@@ -12,7 +13,7 @@ interface Screen13LiveRaceProps {
 export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({ 
   onNavigate,
   passageText: propPassageText
-}) => {
+}: Screen13LiveRaceProps) => {
   const { user } = useAuth();
   const { passageText: racePassage, players, sendProgress, submitFinalRace } = useRace();
   
