@@ -1,0 +1,141 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String?   @unique
+  passwordHash String?
+  authProvider String    @default("local") // local, google, guest
+  role         String    @default("player") // player, moderator, admin
+  status       String    @default("active") // active, suspended, flagged
+  isVerified   Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  profile      Profile?
+  stats        PlayerStats?
+  raceResults  RaceResult[]
+  transactions WalletTransaction[]
+  inventory    InventoryItem[]
+  achievements UserAchievement[]
+
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nickname    String
+  avatarId    String   @default("🏎️")
+  countryCode String   @default("US")
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+model PlayerStats {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verifiedBestWpm Int      @default(0)
+  avgWpm          Int      @default(0)
+  accuracy        Float    @default(100.0)
+  racesCount      Int      @default(0)
+  winsCount       Int      @default(0)
+  xp              Int      @default(0)
+  level           Int      @default(1)
+  coins           Int      @default(2500)
+  updatedAt       DateTime @updatedAt
+
+  @@map("player_stats")
+}
+
+model Passage {
+  id         String   @id @default(uuid())
+  locale     String   @default("en")
+  text       String
+  difficulty String   @default("normal") // easy, normal, hard, expert
+  category   String   @default("general") // general, motorsport, science, literature
+  status     String   @default("active") // active, retired
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+
+  @@map("passages")
+}
+
+model RaceResult {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode        String   @default("quick") // quick, bot, practice, private
+  wpm         Int
+  accuracy    Float
+  durationSec Float
+  place       Int
+  passageId   String?
+  xpEarned    Int      @default(0)
+  coinsEarned Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@map("race_results")
+}
+
+model WalletTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta       Int      // positive for reward, negative for purchase
+  reason      String   // race_reward, shop_purchase, daily_challenge, admin_grant
+  balancePost Int
+  createdAt   DateTime @default(now())
+
+  @@map("wallet_transactions")
+}
+
+model InventoryItem {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId      String   // car-blaze, car-thunder, etc.
+  itemType    String   // car, trail, badge
+  isEquipped  Boolean  @default(false)
+  purchasedAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+  @@map("inventory_items")
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  title       String
+  description String
+  badgeIcon   String
+  xpReward    Int      @default(100)
+  coinReward  Int      @default(250)
+
+  users       UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  earnedAt      DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
