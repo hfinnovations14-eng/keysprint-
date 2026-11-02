@@ -397,3 +397,4 @@ export const challengeFriend = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ error: 'Failed to send challenge' });
   }
 };
+

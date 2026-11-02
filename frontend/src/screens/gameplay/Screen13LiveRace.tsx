@@ -4,6 +4,7 @@ import { Trophy, Volume2, VolumeX, Eye, Flag, Zap, RotateCcw, AlertTriangle } fr
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { useRace } from '../../context/RaceContext';
 import { useAuth } from '../../context/AuthContext';
+import { recordKeystroke } from '../../services/telemetryService';
 
 interface Screen13LiveRaceProps {
   onNavigate: (screenId: string) => void;
@@ -64,6 +65,11 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
       setErrorIndex(null);
       setCorrectKeystrokes(prev => prev + 1);
 
+      // Record accurate keystroke in telemetry
+      if (val.length > 0) {
+        recordKeystroke(val[val.length - 1], false);
+      }
+
       // Compute Live WPM
       const elapsedMinutes = Math.max(0.05, elapsedSeconds / 60);
       const calculatedWpm = Math.round((val.length / 5) / elapsedMinutes);
@@ -101,6 +107,11 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
         }, 500);
       }
     } else {
+      // Keystroke error! Log missed key in telemetry
+      const expectedChar = activePassage[typedInput.length] || '';
+      if (expectedChar) {
+        recordKeystroke(expectedChar, true);
+      }
       setErrorIndex(val.length - 1);
     }
   };

@@ -23,3 +23,4 @@ router.put('/notifications/:id/read', authenticateToken, markNotificationRead);
 router.post('/challenge', authenticateToken, challengeFriend);
 
 export default router;
+

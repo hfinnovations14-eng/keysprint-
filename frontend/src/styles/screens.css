@@ -2622,3 +2622,282 @@
 }
 
 
+
+/* ==========================================================================
+   STATISTICS & QWERTY HEATMAP STYLES (Screen 22)
+   ========================================================================== */
+.stats-master-card {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.history-chart-card {
+  background: #FFFDF9;
+  border-radius: var(--radius-xl);
+  padding: 24px;
+}
+
+.history-chart-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 180px;
+  padding: 20px 8px 8px;
+  gap: 8px;
+  border-bottom: 2px solid #E5D6C4;
+}
+
+.chart-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bar-track {
+  width: 100%;
+  max-width: 38px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: #F4E8D8;
+  border-radius: 6px 6px 0 0;
+  position: relative;
+}
+
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #FF7A45 0%, #FF5A1F 100%);
+  border-radius: 6px 6px 0 0;
+  position: relative;
+  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 8px;
+}
+
+.bar-fill:hover {
+  background: #E04810;
+}
+
+.bar-tooltip {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--primary-orange);
+  white-space: nowrap;
+}
+
+.column-label {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+/* Heatmap QWERTY Board */
+.heatmap-master-card {
+  border-radius: var(--radius-xl);
+  padding: 24px;
+}
+
+.heatmap-legend .legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.virtual-keyboard-board {
+  background: #27272A;
+  border-radius: 16px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.keyboard-visual-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  width: 100%;
+}
+
+.keyboard-visual-row.row-1 {
+  padding-left: 0;
+}
+
+.keyboard-visual-row.row-2 {
+  padding-left: 20px;
+}
+
+.keyboard-visual-row.row-3 {
+  padding-left: 40px;
+}
+
+.heat-key-btn {
+  flex: 1;
+  max-width: 58px;
+  min-width: 36px;
+  height: 54px;
+  background: #3F3F46;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  color: #FFFFFF;
+}
+
+.heat-key-btn:hover {
+  transform: translateY(-2px);
+  background: #52525B;
+}
+
+.heat-key-btn.selected {
+  transform: translateY(-3px) scale(1.05);
+  background: #18181B;
+}
+
+.heat-key-letter {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.heat-key-badge {
+  font-size: 9px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #FFFFFF;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.1;
+}
+
+.selected-key-banner {
+  background: #FFFDF9;
+  border-radius: 14px;
+  border: 1.5px solid #E5D6C4;
+}
+
+.weak-keys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.weak-key-card {
+  border-radius: 12px;
+  background: #FFFDF9;
+  border: 1.5px solid #E5D6C4;
+  transition: transform 0.15s ease;
+}
+
+.weak-key-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   PRACTICE MODES & RESULTS STYLES (Screens 33, 14, 34)
+   ========================================================================== */
+.practice-selector-card {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.drills-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.drill-card {
+  background: #FFFDF9;
+  border: 2px solid #E5D6C4;
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.drill-card:hover {
+  border-color: var(--primary-orange);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px -5px rgba(255, 90, 31, 0.15);
+}
+
+.drill-icon {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.practice-results-card {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.results-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+
+.result-metric-card {
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  border: 1.5px solid #E5D6C4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.metric-big-number {
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 4px 0 2px;
+}
+
+.metric-sublabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.coach-recommendation-box {
+  border-radius: 16px;
+  padding: 24px;
+  border: 1.5px solid #E5D6C4;
+}
+
+.coach-header {
+  border-bottom: 1.5px solid #E5D6C4;
+  padding-bottom: 12px;
+}
+
+.results-actions-row {
+  border-top: 1.5px solid #E5D6C4;
+  padding-top: 24px;
+}

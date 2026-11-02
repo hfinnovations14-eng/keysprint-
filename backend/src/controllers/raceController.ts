@@ -37,6 +37,87 @@ export const getRandomPassage = async (req: AuthRequest, res: Response) => {
   }
 };
 
+const WEAK_KEY_DRILLS: Record<string, string> = {
+  P: "Peter piper picked a pack of purple peppers promptly while purple sports prototypes powered past the pit lane perimeter.",
+  Q: "Quick quartz quality requires quiet technique and quaint quintessential quotes about quantum mechanics and torque equations.",
+  B: "Blue turbo boosters blast blazing backfires beneath balanced bumpers as brave drivers battle between broad boundaries.",
+  Z: "Zealous zooming zebra sports cars zigzagged through freezing blizzard zones with zero hesitation and maximized velocity.",
+  X: "Extreme apex execution exhibits extraordinary axle acceleration and unexpected explosive exhaust expansion.",
+  C: "Crisp cornering clutches conquer curved circuits as classic custom chassis circle clean competitive courses."
+};
+
+const NUMBERS_PUNCTUATION_DRILLS = [
+  "In 2026, race #48 clocked 134.5 WPM at $2,500 prize valuation; 99.8% precision with [10/10] nitro boosts!",
+  "Lap 1: 01:24.89; Lap 2: 01:23.12 (delta: -1.77s). Fuel pressure at 45.8 PSI, engine temp 98.4°C @ 8,500 RPM.",
+  "Formula 1 regulations: Section 14.2(b) stipulates that car weight must exceed 798kg (including driver + tires)."
+];
+
+export const getPracticeDrill = async (req: AuthRequest, res: Response) => {
+  try {
+    const { mode = 'normal', keys = '', duration = '60' } = req.query;
+
+    if (mode === 'numbers') {
+      const idx = Math.floor(Math.random() * NUMBERS_PUNCTUATION_DRILLS.length);
+      return res.json({
+        drill: {
+          id: `drill_num_${idx}`,
+          title: 'Numbers & Punctuation Practice',
+          text: NUMBERS_PUNCTUATION_DRILLS[idx],
+          mode: 'numbers'
+        }
+      });
+    }
+
+    if (mode === 'keys') {
+      const keyList = (typeof keys === 'string' ? keys.split(',') : ['P', 'Q'])
+        .map(k => k.trim().toUpperCase())
+        .filter(k => k);
+
+      let drillText = '';
+      for (const k of keyList) {
+        if (WEAK_KEY_DRILLS[k]) {
+          drillText += (drillText ? ' ' : '') + WEAK_KEY_DRILLS[k];
+        }
+      }
+      if (!drillText) {
+        drillText = "Quick purple prototypes zigzagged between balanced borders with extreme precision and torque.";
+      }
+
+      return res.json({
+        drill: {
+          id: `drill_keys_${keyList.join('_')}`,
+          title: `Targeted Drill: ${keyList.join(', ')} Keys`,
+          text: drillText,
+          mode: 'keys',
+          targetKeys: keyList
+        }
+      });
+    }
+
+    if (mode === 'timed') {
+      const longPassages = [
+        "Consistent rhythm and calm hand position unlock maximum typing speed. Keep your fingers hovering lightly above the home row, striking each letter with relaxed precision. Focus on smooth keystrokes rather than rushing, because rhythm naturally transforms into velocity.",
+        "High performance motorsport engineering requires complete synchronization between mechanical hardware and human reaction timing. A racing driver processes tire friction and apex curvature in split seconds, just as an elite typist translates words into finger movements without hesitation."
+      ];
+      const idx = Math.floor(Math.random() * longPassages.length);
+      return res.json({
+        drill: {
+          id: `drill_timed_${duration}`,
+          title: `${duration}s Timed Speed Sprint`,
+          text: longPassages[idx],
+          mode: 'timed',
+          durationSec: Number(duration) || 60
+        }
+      });
+    }
+
+    return getRandomPassage(req, res);
+  } catch (error: any) {
+    console.error('Practice drill error:', error);
+    return res.status(500).json({ error: 'Failed to generate practice drill' });
+  }
+};
+
 export const submitRaceResult = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;

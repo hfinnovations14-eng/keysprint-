@@ -56,6 +56,14 @@ export const api = {
   getPassage: (difficulty?: string) =>
     request(`/race/passage${difficulty ? `?difficulty=${difficulty}` : ''}`),
 
+  getPracticeDrill: (params: { mode?: string; keys?: string; duration?: number | string }) => {
+    const q = new URLSearchParams();
+    if (params.mode) q.set('mode', params.mode);
+    if (params.keys) q.set('keys', params.keys);
+    if (params.duration) q.set('duration', String(params.duration));
+    return request(`/race/practice/drill?${q.toString()}`);
+  },
+
   submitRaceResult: (result: {
     wpm: number;
     accuracy: number;
