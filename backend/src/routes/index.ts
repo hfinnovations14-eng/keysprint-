@@ -4,6 +4,7 @@ import raceRoutes from './raceRoutes.js';
 import userRoutes from './userRoutes.js';
 import leaderboardRoutes from './leaderboardRoutes.js';
 import adminRoutes from './adminRoutes.js';
+import socialRoutes from './socialRoutes.js';
 
 const router = Router();
 
@@ -12,6 +13,7 @@ router.use('/race', raceRoutes);
 router.use('/user', userRoutes);
 router.use('/leaderboard', leaderboardRoutes);
 router.use('/admin', adminRoutes);
+router.use('/social', socialRoutes);
 
 router.get('/health', (req, res) => {
   res.json({

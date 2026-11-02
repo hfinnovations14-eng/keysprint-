@@ -36,6 +36,21 @@ export interface Room {
 }
 
 const rooms = new Map<string, Room>();
+let ioInstance: Server | null = null;
+export const onlineUsers = new Map<string, string>(); // userId -> socketId
+
+export const isUserOnline = (userId: string): boolean => {
+  return onlineUsers.has(userId);
+};
+
+export const sendSocketNotification = (userId: string, event: string, payload: any): boolean => {
+  const socketId = onlineUsers.get(userId);
+  if (socketId && ioInstance) {
+    ioInstance.to(socketId).emit(event, payload);
+    return true;
+  }
+  return false;
+};
 
 const BOT_PROFILES = [
   { name: 'Turbo Bot [AI]', carId: 'thunder', avatar: '🤖', baseWpm: 85 },
@@ -77,6 +92,8 @@ const getRoomPayload = (room: Room) => ({
 });
 
 export const initRaceSocket = (io: Server) => {
+  ioInstance = io;
+
   const sendRoomUpdate = (room: Room) => {
     io.to(room.id).emit('room.update', getRoomPayload(room));
   };
@@ -180,6 +197,10 @@ export const initRaceSocket = (io: Server) => {
   };
 
   io.on('connection', (socket: Socket) => {
+
+    socket.on('user.register', ({ userId }: { userId: string }) => {
+      if (userId) onlineUsers.set(userId, socket.id);
+    });
 
     // 1. PUBLIC MATCHMAKING JOIN
     socket.on('match.join', async ({ userId, nickname, carId, avatar, roomId }: { userId: string; nickname: string; carId: string; avatar?: string; roomId?: string }) => {
@@ -513,6 +534,12 @@ export const initRaceSocket = (io: Server) => {
 
     // 8. DISCONNECT
     socket.on('disconnect', () => {
+      for (const [uId, sId] of onlineUsers.entries()) {
+        if (sId === socket.id) {
+          onlineUsers.delete(uId);
+          break;
+        }
+      }
       handlePlayerLeave(socket);
     });
   });

@@ -5,7 +5,7 @@ import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { CarModelId } from './components/common/SvgCar';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { RaceProvider } from './context/RaceContext';
+import { RaceProvider, useRace } from './context/RaceContext';
 
 // PUBLIC SCREENS
 import { Screen01Homepage } from './screens/public/Screen01Homepage';
@@ -80,6 +80,7 @@ import { ScreenOverviewBoard } from './screens/overview/ScreenOverviewBoard';
 
 const AppContent: React.FC = () => {
   const { user, updateCoins, equipCar, purchaseCar } = useAuth();
+  const { incomingChallenge, dismissChallenge, joinPrivateRoom } = useRace();
   const [currentScreenId, setCurrentScreenId] = useState<string>('screen-01');
   const [viewport, setViewport] = useState<ViewportMode>('desktop');
 
@@ -281,6 +282,38 @@ const AppContent: React.FC = () => {
               coins={liveCoins}
               level={liveLevel}
             />
+          )}
+
+          {/* REAL-TIME INCOMING CHALLENGE TOAST */}
+          {incomingChallenge && (
+            <div className="card-cream border-orange p-3 mx-4 my-2 flex-between shadow-lg" style={{ borderRadius: 12 }}>
+              <div className="flex-center gap-2">
+                <span style={{ fontSize: 24 }}>{incomingChallenge.challengerAvatar || '🏎️'}</span>
+                <div>
+                  <strong>{incomingChallenge.challengerName}</strong> challenged you to a race!
+                  <span className="text-xs text-secondary block font-mono">Room Code: {incomingChallenge.roomCode}</span>
+                </div>
+              </div>
+              <div className="flex-center gap-2">
+                <button
+                  className="btn btn-primary btn-sm flex-center gap-1"
+                  onClick={async () => {
+                    const code = incomingChallenge.roomCode;
+                    dismissChallenge();
+                    await joinPrivateRoom(code);
+                    setCurrentScreenId('screen-18');
+                  }}
+                >
+                  <span>Accept & Race</span>
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={dismissChallenge}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Active Screen View */}

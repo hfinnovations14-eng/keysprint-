@@ -25,6 +25,9 @@ model User {
   inventory    InventoryItem[]
   achievements UserAchievement[]
   dailyClaims  DailyChallengeClaim[]
+  sentFriendships     Friendship[] @relation("FriendshipRequester")
+  receivedFriendships Friendship[] @relation("FriendshipReceiver")
+  notifications       UserNotification[]
 
   @@map("users")
 }
@@ -151,4 +154,32 @@ model DailyChallengeClaim {
 
   @@unique([userId, challengeId, claimedDate])
   @@map("daily_challenge_claims")
+}
+
+model Friendship {
+  id          String   @id @default(uuid())
+  requesterId String
+  requester   User     @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User     @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  status      String   @default("pending") // pending, accepted, rejected, blocked
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([requesterId, receiverId])
+  @@map("friendships")
+}
+
+model UserNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // race_invite, friend_request, friend_accepted, reward, achievement
+  title     String
+  message   String
+  data      String?  // JSON serialized payload: { roomCode, fromNickname, fromAvatar }
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("user_notifications")
 }

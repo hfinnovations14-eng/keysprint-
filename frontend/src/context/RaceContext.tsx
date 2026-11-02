@@ -50,6 +50,12 @@ export interface RaceResultSummary {
   }>;
 }
 
+export interface IncomingChallenge {
+  roomCode: string;
+  challengerName: string;
+  challengerAvatar: string;
+}
+
 interface RaceContextType {
   roomId: string | null;
   roomCode: string | null;
@@ -60,6 +66,8 @@ interface RaceContextType {
   countdown: number;
   lastResult: RaceResultSummary | null;
   roomError: string | null;
+  incomingChallenge: IncomingChallenge | null;
+  dismissChallenge: () => void;
   clearRoomError: () => void;
   joinMatchmaking: (targetRoomId?: string) => void;
   leaveMatchmaking: () => void;
@@ -94,12 +102,21 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
   const [countdown, setCountdown] = useState<number>(3);
   const [lastResult, setLastResult] = useState<RaceResultSummary | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
+  const [incomingChallenge, setIncomingChallenge] = useState<IncomingChallenge | null>(null);
 
   const socketRef = useRef(getSocket());
 
   useEffect(() => {
     const s = connectSocket();
     socketRef.current = s;
+
+    if (user?.id) {
+      s.emit('user.register', { userId: user.id });
+    }
+
+    s.on('social.challenge_received', (data: IncomingChallenge) => {
+      setIncomingChallenge(data);
+    });
 
     s.on('room.update', (data: {
       roomId: string;
@@ -161,8 +178,13 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       s.off('match.countdown');
       s.off('match.start');
       s.off('players.progress');
+      s.off('social.challenge_received');
     };
   }, [user?.id]);
+
+  const dismissChallenge = () => {
+    setIncomingChallenge(null);
+  };
 
   const clearRoomError = () => {
     setRoomError(null);
@@ -366,6 +388,8 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
         countdown,
         lastResult,
         roomError,
+        incomingChallenge,
+        dismissChallenge,
         clearRoomError,
         joinMatchmaking,
         leaveMatchmaking,

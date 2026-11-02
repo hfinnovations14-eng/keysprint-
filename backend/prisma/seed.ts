@@ -46,6 +46,53 @@ async function main() {
 
   console.log('✅ Admin user seeded:', adminUser.email);
 
+  const demoDrivers = [
+    { email: 'emma@keysprint.io', nickname: 'Emma', avatar: '👩‍🦰', car: 'blaze', bestWpm: 138, avgWpm: 126, races: 180, wins: 45, level: 8 },
+    { email: 'liam@keysprint.io', nickname: 'Liam', avatar: '👱‍♂️', car: 'golden', bestWpm: 142, avgWpm: 130, races: 210, wins: 62, level: 10 },
+    { email: 'sophia@keysprint.io', nickname: 'Sophia', avatar: '👧', car: 'forest', bestWpm: 125, avgWpm: 115, races: 140, wins: 28, level: 6 },
+    { email: 'racerx@keysprint.io', nickname: 'RacerX_99', avatar: '🏎️', car: 'retro', bestWpm: 160, avgWpm: 148, races: 430, wins: 190, level: 18 }
+  ];
+
+  for (const driver of demoDrivers) {
+    const existing = await prisma.user.findUnique({ where: { email: driver.email } });
+    if (!existing) {
+      await prisma.user.create({
+        data: {
+          email: driver.email,
+          passwordHash: adminPasswordHash,
+          role: 'player',
+          isVerified: true,
+          profile: {
+            create: {
+              nickname: driver.nickname,
+              avatarId: driver.avatar,
+              countryCode: 'US',
+              bio: `KeySprint racer • Best ${driver.bestWpm} WPM`
+            }
+          },
+          stats: {
+            create: {
+              verifiedBestWpm: driver.bestWpm,
+              avgWpm: driver.avgWpm,
+              accuracy: 98.4,
+              racesCount: driver.races,
+              winsCount: driver.wins,
+              xp: driver.level * 1000,
+              level: driver.level,
+              coins: 3500
+            }
+          },
+          inventory: {
+            create: [
+              { itemId: driver.car, itemType: 'car', isEquipped: true }
+            ]
+          }
+        }
+      });
+    }
+  }
+  console.log('✅ Demo drivers seeded');
+
   const passages = [
     {
       text: "The quick brown fox jumps over the lazy dog while high performance sports cars thunder down the championship asphalt highway at breakneck velocity.",

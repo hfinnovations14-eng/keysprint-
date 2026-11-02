@@ -89,6 +89,21 @@ export const api = {
   claimDailyChallenge: (challengeId: string) =>
     request('/user/daily-challenges/claim', { method: 'POST', body: JSON.stringify({ challengeId }) }),
 
+  // Social & Friends
+  getFriends: () => request('/social/friends'),
+  searchUsers: (query: string) => request(`/social/users/search?q=${encodeURIComponent(query)}`),
+  sendFriendRequest: (payload: { targetUserId?: string; nickname?: string }) =>
+    request('/social/friends/request', { method: 'POST', body: JSON.stringify(payload) }),
+  acceptFriendRequest: (friendshipId: string) =>
+    request('/social/friends/accept', { method: 'PUT', body: JSON.stringify({ friendshipId }) }),
+  removeFriend: (friendshipId: string) =>
+    request(`/social/friends/${friendshipId}`, { method: 'DELETE' }),
+  getNotifications: () => request('/social/notifications'),
+  markNotificationRead: (id: string) =>
+    request(`/social/notifications/${id}/read`, { method: 'PUT' }),
+  challengeFriend: (payload: { friendUserId: string; roomCode?: string }) =>
+    request('/social/challenge', { method: 'POST', body: JSON.stringify(payload) }),
+
   // Admin
   getAdminMetrics: () => request('/admin/metrics'),
   getAdminUsers: () => request('/admin/users'),

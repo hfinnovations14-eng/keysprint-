@@ -2513,3 +2513,112 @@
   100% { transform: scale(1.02); }
 }
 
+/* ==========================================================================
+   FRIENDS & SOCIAL STYLES (Screen 30)
+   ========================================================================== */
+.friends-master-card {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.friends-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.friends-list-stack, .notifs-list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.friend-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-radius: var(--radius-xl);
+  border: 1.5px solid #EBDDCB;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.friend-left-cell {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.friend-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.friend-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.status-dot-pill.online {
+  background: #DCFCE7;
+  color: #15803D;
+}
+
+.status-dot-pill.in-game {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+.status-dot-pill.offline {
+  background: #F1F5F9;
+  color: #94A3B8;
+}
+
+/* ==========================================================================
+   NOTIFICATIONS STYLES (Screen 31)
+   ========================================================================== */
+.notifs-card {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.notif-item-card {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: var(--radius-xl);
+  border: 1.5px solid #EBDDCB;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.notif-item-card.border-orange {
+  border-color: var(--primary-orange);
+  background: #FFF9EF;
+}
+
+.notif-icon-col {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: #FFFFFF;
+  border: 1px solid #E5D6C4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+
