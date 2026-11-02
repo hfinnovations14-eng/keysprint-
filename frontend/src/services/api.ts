@@ -66,6 +66,7 @@ export const api = {
   }) => request('/race/result', { method: 'POST', body: JSON.stringify(result) }),
 
   getRaceHistory: () => request('/race/history'),
+  checkRoom: (code: string) => request(`/race/room/${encodeURIComponent(code)}`),
 
   // Leaderboard
   getLeaderboard: (country?: string) =>

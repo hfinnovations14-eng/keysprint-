@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../config/db.js';
 import { AuthRequest } from '../middlewares/authMiddleware.js';
+import { getRoomByCode } from '../sockets/raceSocket.js';
 
 export const getRandomPassage = async (req: AuthRequest, res: Response) => {
   try {
@@ -133,5 +134,27 @@ export const getRaceHistory = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('Race history error:', error);
     return res.status(500).json({ error: 'Failed to fetch race history' });
+  }
+};
+
+export const checkRoomExists = async (req: AuthRequest, res: Response) => {
+  try {
+    const { code } = req.params;
+    if (!code) {
+      return res.status(400).json({ error: 'Room code is required' });
+    }
+
+    const room = getRoomByCode(code);
+    if (!room) {
+      return res.status(404).json({ exists: false, error: 'Room not found or expired' });
+    }
+
+    return res.json({
+      exists: true,
+      room
+    });
+  } catch (error: any) {
+    console.error('Check room error:', error);
+    return res.status(500).json({ error: 'Failed to check room status' });
   }
 };

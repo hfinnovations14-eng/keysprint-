@@ -23,7 +23,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
   xpEarned: propXp
 }: Screen16RaceResultsProps) => {
   const { user } = useAuth();
-  const { lastResult, joinMatchmaking } = useRace();
+  const { lastResult, joinMatchmaking, roomMeta } = useRace();
 
   const finalWpm = lastResult?.wpm ?? propWpm ?? 132;
   const finalAcc = lastResult?.accuracy ?? propAcc ?? 98;
@@ -46,8 +46,12 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
   }, []);
 
   const handlePlayAgain = () => {
-    joinMatchmaking();
-    onNavigate('screen-11');
+    if (roomMeta?.isPrivate) {
+      onNavigate('screen-18');
+    } else {
+      joinMatchmaking();
+      onNavigate('screen-11');
+    }
   };
 
   const getPlacementTitle = () => {
@@ -149,7 +153,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
               onClick={handlePlayAgain}
             >
               <RotateCcw size={18} />
-              <span>Race Again</span>
+              <span>{roomMeta?.isPrivate ? 'Return to Lobby' : 'Race Again'}</span>
             </button>
 
             <button 

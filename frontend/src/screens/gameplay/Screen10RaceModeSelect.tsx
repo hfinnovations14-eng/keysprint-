@@ -52,8 +52,8 @@ export const Screen10RaceModeSelect: React.FC<Screen10RaceModeSelectProps> = ({
             <div className="mode-car-wrap">
               <SvgCar id="retro" size={170} />
             </div>
-            <h3 className="mode-title">Create Room</h3>
-            <p className="mode-desc">Invite your friends to a custom private race with room code.</p>
+            <h3 className="mode-title">Private Room</h3>
+            <p className="mode-desc">Create or join a custom race lobby with friends using a room code.</p>
             <div className="mode-footer">
               <span className="mode-tag badge badge-gold">Custom Lobby</span>
               <span className="mode-arrow"><ChevronRight size={18} /></span>
