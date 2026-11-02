@@ -39,6 +39,15 @@ export interface RaceResultSummary {
   place: number;
   coinsEarned: number;
   xpEarned: number;
+  unlockedAchievements?: Array<{
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    badgeIcon: string;
+    xpReward: number;
+    coinReward: number;
+  }>;
 }
 
 interface RaceContextType {
@@ -309,6 +318,7 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     else if (stats.place === 2) earnedXp += 30;
     else if (stats.place === 3) earnedXp += 15;
 
+    let unlocked: any[] = [];
     try {
       const res = await api.submitRaceResult({
         wpm: stats.wpm,
@@ -320,6 +330,9 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       if (res.rewards) {
         earnedCoins = res.rewards.coinsEarned;
         earnedXp = res.rewards.xpEarned;
+      }
+      if (res.unlockedAchievements) {
+        unlocked = res.unlockedAchievements;
       }
       await refreshUser();
     } catch {
@@ -333,7 +346,8 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       durationSec: stats.durationSec,
       place: stats.place,
       coinsEarned: earnedCoins,
-      xpEarned: earnedXp
+      xpEarned: earnedXp,
+      unlockedAchievements: unlocked
     };
 
     setLastResult(summary);

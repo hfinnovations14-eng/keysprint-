@@ -79,9 +79,17 @@ async function main() {
 
   const achievements = [
     { code: 'first_race', title: 'First Gear', description: 'Complete your first live typing race', badgeIcon: '🏎️', xpReward: 100, coinReward: 250 },
-    { code: 'speed_demon_100', title: 'Century Club', description: 'Achieve a verified speed exceeding 100 WPM', badgeIcon: '⚡', xpReward: 500, coinReward: 1000 },
-    { code: 'sharpshooter_99', title: 'Flawless Flow', description: 'Finish a race with 99% or higher accuracy', badgeIcon: '🎯', xpReward: 300, coinReward: 600 },
-    { code: 'podium_master', title: 'Grand Prix Champion', description: 'Win 25 first-place podium finishes', badgeIcon: '🏆', xpReward: 1500, coinReward: 3000 }
+    { code: 'speed_demon_100', title: 'Century Club', description: 'Achieve a verified speed exceeding 100 WPM', badgeIcon: '⚡', xpReward: 300, coinReward: 500 },
+    { code: 'speed_demon_125', title: 'Speed of Sound', description: 'Exceed 125 WPM in an official match', badgeIcon: '🚀', xpReward: 600, coinReward: 1000 },
+    { code: 'speed_demon_150', title: 'Hyperdrive', description: 'Break the sound barrier with 150+ WPM', badgeIcon: '🌌', xpReward: 1000, coinReward: 2000 },
+    { code: 'sharpshooter_98', title: 'Precision Pilot', description: 'Finish a race with 98% or higher accuracy', badgeIcon: '🎯', xpReward: 250, coinReward: 400 },
+    { code: 'sharpshooter_100', title: 'Flawless Flow', description: 'Complete an entire race with 100% perfect accuracy', badgeIcon: '✨', xpReward: 500, coinReward: 1000 },
+    { code: 'podium_winner', title: 'Podium Debut', description: 'Claim 1st place in a multiplayer race', badgeIcon: '🥇', xpReward: 200, coinReward: 400 },
+    { code: 'podium_master_10', title: 'Grand Prix Champion', description: 'Win 10 first-place podium finishes', badgeIcon: '🏆', xpReward: 1000, coinReward: 2000 },
+    { code: 'racer_veteran_10', title: 'Tenured Driver', description: 'Complete 10 total multiplayer races', badgeIcon: '🎖️', xpReward: 400, coinReward: 800 },
+    { code: 'racer_veteran_50', title: 'Asphalt Legend', description: 'Complete 50 competitive races', badgeIcon: '👑', xpReward: 1500, coinReward: 3000 },
+    { code: 'fleet_owner_3', title: 'Garage Collector', description: 'Own at least 3 vehicles in your garage fleet', badgeIcon: '🚗', xpReward: 500, coinReward: 1000 },
+    { code: 'private_duelist', title: 'Private Duelist', description: 'Compete in a custom private room match', badgeIcon: '⚔️', xpReward: 200, coinReward: 350 }
   ];
 
   for (const a of achievements) {

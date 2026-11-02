@@ -24,6 +24,7 @@ model User {
   transactions WalletTransaction[]
   inventory    InventoryItem[]
   achievements UserAchievement[]
+  dailyClaims  DailyChallengeClaim[]
 
   @@map("users")
 }
@@ -138,4 +139,16 @@ model UserAchievement {
 
   @@unique([userId, achievementId])
   @@map("user_achievements")
+}
+
+model DailyChallengeClaim {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId String
+  claimedDate String   // e.g. "2026-11-02"
+  claimedAt   DateTime @default(now())
+
+  @@unique([userId, challengeId, claimedDate])
+  @@map("daily_challenge_claims")
 }

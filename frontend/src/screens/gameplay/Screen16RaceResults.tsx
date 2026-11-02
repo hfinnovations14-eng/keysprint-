@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { Trophy, Zap, Clock, Coins, Star, RotateCcw, Share2, ArrowLeft } from 'lucide-react';
+import { Trophy, Zap, Clock, Coins, Star, RotateCcw, Share2, ArrowLeft, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useRace } from '../../context/RaceContext';
 import { useAuth } from '../../context/AuthContext';
@@ -134,6 +134,26 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
               </div>
             </div>
           </div>
+
+          {/* UNLOCKED ACHIEVEMENTS BANNER */}
+          {lastResult?.unlockedAchievements && lastResult.unlockedAchievements.length > 0 && (
+            <div className="card-cream border-orange p-3 mt-4 text-center">
+              <div className="flex-center gap-2 justify-center mb-1">
+                <Sparkles size={16} className="text-orange" />
+                <strong className="text-orange text-xs font-bold uppercase tracking-wider">New Achievements Unlocked!</strong>
+                <Sparkles size={16} className="text-orange" />
+              </div>
+              <div className="flex-center gap-2 justify-center flex-wrap mt-2">
+                {lastResult.unlockedAchievements.map(ach => (
+                  <span key={ach.id} className="badge badge-gold flex-center gap-1 p-2 font-bold">
+                    <span>{ach.badgeIcon}</span>
+                    <span>{ach.title}</span>
+                    <span className="text-xs text-muted font-normal">(+{ach.xpReward} XP, +{ach.coinReward} Coins)</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* LEVEL PROGRESS BAR */}
           <div className="results-xp-bar-container card-cream mt-4">

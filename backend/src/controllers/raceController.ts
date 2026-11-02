@@ -103,15 +103,93 @@ export const submitRaceResult = async (req: AuthRequest, res: Response) => {
             balancePost: newCoins
           }
         });
+
+        // Evaluate Driver Achievements
+        const existingAchievements = await tx.userAchievement.findMany({
+          where: { userId },
+          include: { achievement: true }
+        });
+        const ownedCodes = new Set(existingAchievements.map(ua => ua.achievement.code));
+        const carCount = await tx.inventoryItem.count({ where: { userId, itemType: 'car' } });
+
+        const codesToAward: string[] = [];
+        if (!ownedCodes.has('first_race') && newRacesCount >= 1) codesToAward.push('first_race');
+        if (!ownedCodes.has('speed_demon_100') && wpm >= 100) codesToAward.push('speed_demon_100');
+        if (!ownedCodes.has('speed_demon_125') && wpm >= 125) codesToAward.push('speed_demon_125');
+        if (!ownedCodes.has('speed_demon_150') && wpm >= 150) codesToAward.push('speed_demon_150');
+        if (!ownedCodes.has('sharpshooter_98') && accuracy >= 98) codesToAward.push('sharpshooter_98');
+        if (!ownedCodes.has('sharpshooter_100') && accuracy >= 100) codesToAward.push('sharpshooter_100');
+        if (!ownedCodes.has('podium_winner') && place === 1) codesToAward.push('podium_winner');
+        if (!ownedCodes.has('podium_master_10') && newWinsCount >= 10) codesToAward.push('podium_master_10');
+        if (!ownedCodes.has('racer_veteran_10') && newRacesCount >= 10) codesToAward.push('racer_veteran_10');
+        if (!ownedCodes.has('racer_veteran_50') && newRacesCount >= 50) codesToAward.push('racer_veteran_50');
+        if (!ownedCodes.has('fleet_owner_3') && carCount >= 3) codesToAward.push('fleet_owner_3');
+        if (!ownedCodes.has('private_duelist') && mode === 'private') codesToAward.push('private_duelist');
+
+        const newlyUnlocked: any[] = [];
+        let bonusXp = 0;
+        let bonusCoins = 0;
+
+        for (const code of codesToAward) {
+          const ach = await tx.achievement.findUnique({ where: { code } });
+          if (ach) {
+            await tx.userAchievement.create({
+              data: {
+                userId,
+                achievementId: ach.id
+              }
+            });
+            bonusXp += ach.xpReward;
+            bonusCoins += ach.coinReward;
+            newlyUnlocked.push(ach);
+          }
+        }
+
+        if (bonusCoins > 0 || bonusXp > 0) {
+          const finalCoins = newCoins + bonusCoins;
+          const finalXp = newXp + bonusXp;
+          const finalLevel = Math.floor(finalXp / 1000) + 1;
+
+          await tx.playerStats.update({
+            where: { userId },
+            data: {
+              coins: finalCoins,
+              xp: finalXp,
+              level: finalLevel
+            }
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              userId,
+              delta: bonusCoins,
+              reason: 'achievement_reward',
+              balancePost: finalCoins
+            }
+          });
+        }
+
+        return {
+          race,
+          unlockedAchievements: newlyUnlocked,
+          totalXpEarned: xpEarned + bonusXp,
+          totalCoinsEarned: coinsEarned + bonusCoins
+        };
       }
 
-      return race;
+      return {
+        race,
+        unlockedAchievements: [],
+        totalXpEarned: xpEarned,
+        totalCoinsEarned: coinsEarned
+      };
     });
 
     return res.status(201).json({
       message: 'Race result saved successfully',
-      result,
-      rewards: { xpEarned, coinsEarned }
+      result: result.race,
+      rewards: { xpEarned: result.totalXpEarned, coinsEarned: result.totalCoinsEarned },
+      unlockedAchievements: result.unlockedAchievements
     });
   } catch (error: any) {
     console.error('Submit race error:', error);

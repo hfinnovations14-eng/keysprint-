@@ -82,6 +82,13 @@ export const api = {
   equipItem: (itemId: string, itemType: string = 'car') =>
     request('/user/garage/equip', { method: 'POST', body: JSON.stringify({ itemId, itemType }) }),
 
+  getAchievements: () => request('/user/achievements'),
+
+  getDailyChallenges: () => request('/user/daily-challenges'),
+
+  claimDailyChallenge: (challengeId: string) =>
+    request('/user/daily-challenges/claim', { method: 'POST', body: JSON.stringify({ challengeId }) }),
+
   // Admin
   getAdminMetrics: () => request('/admin/metrics'),
   getAdminUsers: () => request('/admin/users'),
