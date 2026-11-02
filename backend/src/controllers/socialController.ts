@@ -1,7 +1,9 @@
 import { Response } from 'express';
 import { prisma } from '../config/db.js';
 import { AuthRequest } from '../middlewares/authMiddleware.js';
-import { isUserOnline, sendSocketNotification } from '../sockets/raceSocket.js';
+import { isUserOnline, sendSocketNotification, generateSecureRoomCode } from '../sockets/raceSocket.js';
+
+const challengeCooldowns = new Map<string, number>();
 
 export const getFriends = async (req: AuthRequest, res: Response) => {
   try {
@@ -191,10 +193,45 @@ export const sendFriendRequest = async (req: AuthRequest, res: Response) => {
     });
 
     if (existing) {
+      if (existing.status === 'blocked') {
+        return res.status(403).json({ error: 'User is blocked or unavailable' });
+      }
       if (existing.status === 'accepted') {
         return res.status(400).json({ error: 'You are already friends with this racer' });
       }
-      return res.status(400).json({ error: 'A pending friend request already exists' });
+      if (existing.status === 'pending') {
+        return res.status(400).json({ error: 'A pending friend request already exists' });
+      }
+      if (existing.status === 'rejected') {
+        const updated = await prisma.friendship.update({
+          where: { id: existing.id },
+          data: {
+            requesterId: userId,
+            receiverId: targetId,
+            status: 'pending'
+          }
+        });
+
+        const senderProfile = await prisma.profile.findUnique({ where: { userId } });
+        const senderName = senderProfile?.nickname || 'A racer';
+
+        const notif = await prisma.userNotification.create({
+          data: {
+            userId: targetId,
+            type: 'friend_request',
+            title: 'New Friend Request',
+            message: `${senderName} wants to add you as a racing rival!`,
+            data: JSON.stringify({ requesterId: userId, requesterName: senderName, friendshipId: updated.id })
+          }
+        });
+
+        sendSocketNotification(targetId, 'notification.new', notif);
+
+        return res.status(200).json({
+          message: 'Friend request sent',
+          friendship: updated
+        });
+      }
     }
 
     const friendship = await prisma.friendship.create({
@@ -275,6 +312,110 @@ export const acceptFriendRequest = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('Accept friend request error:', error);
     return res.status(500).json({ error: 'Failed to accept friend request' });
+  }
+};
+
+export const rejectFriendRequest = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { friendshipId } = req.body;
+    if (!friendshipId) return res.status(400).json({ error: 'friendshipId is required' });
+
+    const friendship = await prisma.friendship.findUnique({
+      where: { id: friendshipId }
+    });
+
+    if (!friendship || friendship.receiverId !== userId) {
+      return res.status(404).json({ error: 'Friend request not found or unauthorized' });
+    }
+
+    const updated = await prisma.friendship.update({
+      where: { id: friendshipId },
+      data: { status: 'rejected' }
+    });
+
+    return res.json({
+      message: 'Friend request rejected',
+      friendship: updated
+    });
+  } catch (error: any) {
+    console.error('Reject friend request error:', error);
+    return res.status(500).json({ error: 'Failed to reject friend request' });
+  }
+};
+
+export const blockUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { targetUserId } = req.body;
+    if (!targetUserId) return res.status(400).json({ error: 'targetUserId is required' });
+    if (targetUserId === userId) return res.status(400).json({ error: 'You cannot block yourself' });
+
+    const existing = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { requesterId: userId, receiverId: targetUserId },
+          { requesterId: targetUserId, receiverId: userId }
+        ]
+      }
+    });
+
+    if (existing) {
+      const updated = await prisma.friendship.update({
+        where: { id: existing.id },
+        data: {
+          requesterId: userId,
+          receiverId: targetUserId,
+          status: 'blocked'
+        }
+      });
+      return res.json({ message: 'User blocked successfully', friendship: updated });
+    }
+
+    const created = await prisma.friendship.create({
+      data: {
+        requesterId: userId,
+        receiverId: targetUserId,
+        status: 'blocked'
+      }
+    });
+
+    return res.status(201).json({ message: 'User blocked successfully', friendship: created });
+  } catch (error: any) {
+    console.error('Block user error:', error);
+    return res.status(500).json({ error: 'Failed to block user' });
+  }
+};
+
+export const unblockUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { targetUserId } = req.body;
+    if (!targetUserId) return res.status(400).json({ error: 'targetUserId is required' });
+
+    const existing = await prisma.friendship.findFirst({
+      where: {
+        requesterId: userId,
+        receiverId: targetUserId,
+        status: 'blocked'
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Blocked record not found' });
+    }
+
+    await prisma.friendship.delete({ where: { id: existing.id } });
+    return res.json({ message: 'User unblocked successfully' });
+  } catch (error: any) {
+    console.error('Unblock user error:', error);
+    return res.status(500).json({ error: 'Failed to unblock user' });
   }
 };
 
@@ -359,8 +500,36 @@ export const challengeFriend = async (req: AuthRequest, res: Response) => {
 
     const { friendUserId, roomCode } = req.body;
     if (!friendUserId) return res.status(400).json({ error: 'friendUserId is required' });
+    if (friendUserId === userId) return res.status(400).json({ error: 'You cannot challenge yourself' });
 
-    const code = roomCode || `SPRINT-${Math.floor(10 + Math.random() * 90)}`;
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { requesterId: userId, receiverId: friendUserId },
+          { requesterId: friendUserId, receiverId: userId }
+        ]
+      }
+    });
+
+    if (friendship?.status === 'blocked') {
+      return res.status(403).json({ error: 'User is blocked or unavailable' });
+    }
+
+    if (!friendship || friendship.status !== 'accepted') {
+      return res.status(400).json({ error: 'You can only challenge accepted friends' });
+    }
+
+    // Rate limiting: 30-second cooldown per (challenger, challenged)
+    const cooldownKey = `${userId}:${friendUserId}`;
+    const lastChallenge = challengeCooldowns.get(cooldownKey);
+    const now = Date.now();
+    if (lastChallenge && now - lastChallenge < 30000) {
+      const waitSec = Math.ceil((30000 - (now - lastChallenge)) / 1000);
+      return res.status(429).json({ error: `Please wait ${waitSec}s before challenging this friend again` });
+    }
+    challengeCooldowns.set(cooldownKey, now);
+
+    const code = roomCode || generateSecureRoomCode();
 
     const myProfile = await prisma.profile.findUnique({ where: { userId } });
     const myName = myProfile?.nickname || 'Your rival';

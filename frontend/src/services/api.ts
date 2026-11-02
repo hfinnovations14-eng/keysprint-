@@ -77,14 +77,19 @@ export const api = {
   checkRoom: (code: string) => request(`/race/room/${encodeURIComponent(code)}`),
 
   // Leaderboard
-  getLeaderboard: (country?: string) =>
-    request(`/leaderboard${country && country !== 'all' ? `?country=${country}` : ''}`),
+  getLeaderboard: (country?: string, filter?: string) => {
+    const q = new URLSearchParams();
+    if (country && country !== 'all') q.set('country', country);
+    if (filter) q.set('filter', filter);
+    const queryString = q.toString();
+    return request(`/leaderboard${queryString ? `?${queryString}` : ''}`);
+  },
 
   // User & Shop
   updateProfile: (profile: { nickname?: string; avatarId?: string; countryCode?: string; bio?: string }) =>
     request('/user/profile', { method: 'PUT', body: JSON.stringify(profile) }),
 
-  purchaseStoreItem: (itemId: string, cost: number, itemType: string = 'car') =>
+  purchaseStoreItem: (itemId: string, cost?: number, itemType: string = 'car') =>
     request('/user/store/purchase', { method: 'POST', body: JSON.stringify({ itemId, cost, itemType }) }),
 
   equipItem: (itemId: string, itemType: string = 'car') =>
@@ -104,6 +109,12 @@ export const api = {
     request('/social/friends/request', { method: 'POST', body: JSON.stringify(payload) }),
   acceptFriendRequest: (friendshipId: string) =>
     request('/social/friends/accept', { method: 'PUT', body: JSON.stringify({ friendshipId }) }),
+  rejectFriendRequest: (friendshipId: string) =>
+    request('/social/friends/reject', { method: 'PUT', body: JSON.stringify({ friendshipId }) }),
+  blockUser: (targetUserId: string) =>
+    request('/social/friends/block', { method: 'POST', body: JSON.stringify({ targetUserId }) }),
+  unblockUser: (targetUserId: string) =>
+    request('/social/friends/unblock', { method: 'POST', body: JSON.stringify({ targetUserId }) }),
   removeFriend: (friendshipId: string) =>
     request(`/social/friends/${friendshipId}`, { method: 'DELETE' }),
   getNotifications: () => request('/social/notifications'),
@@ -111,6 +122,16 @@ export const api = {
     request(`/social/notifications/${id}/read`, { method: 'PUT' }),
   challengeFriend: (payload: { friendUserId: string; roomCode?: string }) =>
     request('/social/challenge', { method: 'POST', body: JSON.stringify(payload) }),
+
+  // Tournaments (Phase 4.3)
+  getTournaments: () => request('/tournaments'),
+  getTournamentDetails: (id: string) => request(`/tournaments/${id}`),
+  registerTournament: (id: string) =>
+    request(`/tournaments/${id}/register`, { method: 'POST' }),
+  submitTournamentRace: (id: string, result: { wpm: number; accuracy: number; durationSec: number; place: number }) =>
+    request(`/tournaments/${id}/race`, { method: 'POST', body: JSON.stringify(result) }),
+  getTournamentStandings: (id: string) =>
+    request(`/tournaments/${id}/standings`),
 
   // Admin
   getAdminMetrics: () => request('/admin/metrics'),

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Edit3, Trophy, Zap, Target, Flag, Flame, Globe } from 'lucide-react';
+import { CheckCircle2, Edit3, Trophy, Zap, Target, Flag, Flame, Globe, Lock, Check } from 'lucide-react';
 import { SvgCar } from '../../components/common/SvgCar';
 import { useAuth } from '../../context/AuthContext';
 import { CARS_DATA } from '../../data/carsData';
@@ -161,15 +161,41 @@ export const Screen20Profile: React.FC<Screen20ProfileProps> = ({ onNavigate }) 
         {activeTab === 'Cars' && (
           <div className="profile-tab-content mt-4">
             <div className="garage-grid-simple">
-              {CARS_DATA.map((car) => (
-                <div key={car.id} className="car-inventory-card card text-center">
-                  <div className="car-thumb-wrap">
-                    <SvgCar id={car.id} size={130} />
+              {CARS_DATA.map((car) => {
+                const isOwned = car.id === 'starter' || !!user?.inventory?.some(i => i.itemId === car.id);
+                const isEquipped = !!user?.inventory?.some(i => i.itemId === car.id && i.isEquipped);
+
+                return (
+                  <div 
+                    key={car.id} 
+                    className={`car-inventory-card card text-center ${!isOwned ? 'opacity-60' : ''}`}
+                  >
+                    <div className="car-thumb-wrap">
+                      <SvgCar id={car.id} size={130} />
+                    </div>
+                    <h4 className="mt-2">{car.name}</h4>
+                    <div className="flex-center gap-1 mt-1 justify-center">
+                      <span className={`badge badge-${car.category.toLowerCase()}`}>{car.category}</span>
+                      {isEquipped ? (
+                        <span className="badge badge-green flex-center gap-1">
+                          <Check size={10} /> Equipped
+                        </span>
+                      ) : isOwned ? (
+                        <span className="badge badge-blue">Owned</span>
+                      ) : (
+                        <span className="badge badge-secondary flex-center gap-1 text-xs">
+                          <Lock size={10} /> Locked
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <h4 className="mt-2">{car.name}</h4>
-                  <span className={`badge badge-${car.category.toLowerCase()}`}>{car.category}</span>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+            <div className="text-center mt-4">
+              <button className="btn btn-primary btn-sm" onClick={() => onNavigate('screen-24')}>
+                Open Vehicle Garage
+              </button>
             </div>
           </div>
         )}

@@ -21,11 +21,15 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
   const [activeTab, setActiveTab] = useState<'Cars' | 'Wheels' | 'Trails' | 'Effects' | 'Bundles'>('Cars');
   const [selectedItemForPurchase, setSelectedItemForPurchase] = useState<any | null>(null);
 
-  const liveCoins = user?.stats?.coins ?? propCoins ?? 2450;
+  const liveCoins = user?.stats?.coins ?? propCoins ?? 0;
 
   const isCarOwned = (carId: string) => {
     if (carId === 'starter') return true;
     return !!user?.inventory?.some(i => i.itemId === carId);
+  };
+
+  const isItemOwned = (itemId: string) => {
+    return !!user?.inventory?.some(i => i.itemId === itemId);
   };
 
   const isCarEquipped = (carId: string) => {
@@ -38,9 +42,10 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
 
   const handleConfirmPurchase = async (cost: number) => {
     if (!selectedItemForPurchase) return;
-    const carId = selectedItemForPurchase.carId || selectedItemForPurchase.id;
-    await purchaseCar(carId, cost);
-    if (onPurchaseItem) onPurchaseItem(cost);
+    const itemId = selectedItemForPurchase.id || selectedItemForPurchase.carId;
+    const itemType = selectedItemForPurchase.itemType || selectedItemForPurchase.type || 'car';
+    await purchaseCar(itemId, cost, itemType);
+    setSelectedItemForPurchase(null);
   };
 
   const cosmeticTrails = [
@@ -102,11 +107,13 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
               <button 
                 className="btn btn-primary btn-lg"
                 onClick={() => handleOpenPurchase({
+                  id: 'bundle-racing-legend',
                   name: 'Racing Legend Pack (Bundle)',
                   price: 3500,
                   category: 'Legendary',
+                  itemType: 'bundle',
                   carId: 'golden',
-                  desc: 'Includes 3 top tier motorsport cars and special stadium trail effects.'
+                  desc: 'Includes 3 top tier motorsport cars (Blaze, Golden Flash, Shadow X) and stadium trail effects.'
                 })}
               >
                 <span>Get Bundle • 🪙 3,500</span>
@@ -203,38 +210,47 @@ export const Screen25Shop: React.FC<Screen25ShopProps> = ({
             </div>
 
             <div className="shop-cars-grid">
-              {cosmeticTrails.map((item) => (
-                <div key={item.id} className="shop-item-card card">
-                  <div className="card-top-tags">
-                    <span className={`badge badge-${item.category.toLowerCase()}`}>{item.category}</span>
-                  </div>
-                  <div className="shop-item-car flex-center py-4">
-                    <Flame size={64} className="text-orange" />
-                  </div>
-                  <div className="shop-item-body">
-                    <h4>{item.name}</h4>
-                    <p className="shop-item-desc text-xs text-secondary">{item.desc}</p>
-                    <div className="shop-item-footer mt-3">
-                      <div className="price-tag">
-                        <Coins size={16} className="text-gold" />
-                        <span>{item.price.toLocaleString()}</span>
+              {cosmeticTrails.map((item) => {
+                const owned = isItemOwned(item.id);
+                return (
+                  <div key={item.id} className="shop-item-card card">
+                    <div className="card-top-tags">
+                      <span className={`badge badge-${item.category.toLowerCase()}`}>{item.category}</span>
+                      {owned && <span className="badge badge-blue">Owned</span>}
+                    </div>
+                    <div className="shop-item-car flex-center py-4">
+                      <Flame size={64} className="text-orange" />
+                    </div>
+                    <div className="shop-item-body">
+                      <h4>{item.name}</h4>
+                      <p className="shop-item-desc text-xs text-secondary">{item.desc}</p>
+                      <div className="shop-item-footer mt-3">
+                        <div className="price-tag">
+                          <Coins size={16} className="text-gold" />
+                          <span>{item.price.toLocaleString()}</span>
+                        </div>
+                        {owned ? (
+                          <span className="status-equipped-text">✓ Owned</span>
+                        ) : (
+                          <button 
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleOpenPurchase({
+                              id: item.id,
+                              name: item.name,
+                              price: item.price,
+                              category: item.category,
+                              desc: item.desc,
+                              itemType: 'trail'
+                            })}
+                          >
+                            Buy Now
+                          </button>
+                        )}
                       </div>
-                      <button 
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleOpenPurchase({
-                          name: item.name,
-                          price: item.price,
-                          category: item.category,
-                          desc: item.desc,
-                          carId: 'blaze'
-                        })}
-                      >
-                        Buy Now
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

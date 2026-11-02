@@ -1020,14 +1020,20 @@
 }
 
 .race-top-card {
-  padding: 16px 24px;
+  padding: 20px 24px;
   margin-bottom: 16px;
+  background: #FFFDF9;
+  border-radius: var(--radius-xl);
+  border: 1.5px solid var(--border-light);
 }
 
-.passage-header-row {
+.race-status-bar {
   display: flex;
   align-items: center;
-  gap: 20px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .lap-counter-pill {
@@ -1036,46 +1042,21 @@
   padding: 6px 14px;
   border-radius: var(--radius-full);
   font-weight: 800;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
 }
 
-.passage-typing-display {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-size: 19px;
-  line-height: 1.5;
-  background: #FFF;
-  border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 12px 18px;
-  min-height: 54px;
-  display: flex;
+.typo-warning-pill {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FCA5A5;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-}
-
-.typed-completed-badge {
-  background: #0284C7;
-  color: #FFFFFF;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-.blinking-cursor {
-  color: var(--primary-orange);
-  font-weight: 900;
-  animation: blink 0.8s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.typed-remaining-text {
-  color: var(--text-primary);
-  font-weight: 500;
+  gap: 5px;
 }
 
 .race-timer-pill {
@@ -1084,17 +1065,140 @@
   gap: 6px;
   background: #111827;
   color: #F8FAFC;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border-radius: var(--radius-full);
   font-family: var(--font-mono);
   font-weight: 800;
-  font-size: 15px;
+  font-size: 14px;
 }
 
-.hidden-typing-input {
+/* Dedicated Spacious Reading & Typing Arena */
+.race-passage-card {
+  position: relative;
+  background: #FFFFFF;
+  border: 2px solid #E5D6C4;
+  border-radius: 14px;
+  padding: 22px 26px;
+  min-height: 110px;
+  cursor: text;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.race-passage-card.focused {
+  border-color: var(--primary-orange);
+  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
+}
+
+.race-passage-card.has-error {
+  border-color: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.passage-char-flow {
+  font-family: var(--font-mono);
+  font-size: 21px;
+  line-height: 1.8;
+  letter-spacing: 0.4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+}
+
+.passage-char-flow .char {
+  position: relative;
+  display: inline;
+}
+
+.passage-char-flow .char-correct {
+  color: #15803D;
+  font-weight: 600;
+}
+
+.passage-char-flow .char-incorrect {
+  color: #B91C1C;
+  background: #FEE2E2;
+  border-radius: 3px;
+  font-weight: 700;
+  text-decoration: underline wavy #DC2626;
+  padding: 0 1px;
+}
+
+.passage-char-flow .char-current {
+  color: #18181B;
+  font-weight: 700;
+}
+
+.passage-char-flow .cursor-caret {
   position: absolute;
+  left: -1.5px;
+  top: 10%;
+  bottom: 10%;
+  width: 2.5px;
+  background: var(--primary-orange);
+  border-radius: 1px;
+  animation: blinkCursor 0.8s infinite ease-in-out;
+  z-index: 3;
+}
+
+@keyframes blinkCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.passage-char-flow .char-upcoming {
+  color: #71717A;
+  opacity: 0.85;
+}
+
+.passage-native-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
+  cursor: text;
+  z-index: 2;
+}
+
+.typing-focus-reminder {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-orange);
+  background: #FFF4E5;
+  border: 1px solid #FED7AA;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
   pointer-events: none;
+  z-index: 1;
+  animation: pulseGrid 1.5s infinite alternate ease-in-out;
+}
+
+/* Practice Typing Arena Styles */
+.practice-typing-arena {
+  border: 2px solid #E5D6C4;
+  border-radius: 16px;
+  padding: 24px;
+  background: #FFFDF9;
+}
+
+.practice-stats-strip {
+  border-bottom: 1.5px solid #E5D6C4;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.stat-pill {
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* 3D Track Viewport */

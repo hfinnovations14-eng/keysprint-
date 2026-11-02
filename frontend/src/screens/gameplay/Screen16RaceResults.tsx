@@ -23,7 +23,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
   xpEarned: propXp
 }: Screen16RaceResultsProps) => {
   const { user } = useAuth();
-  const { lastResult, joinMatchmaking, roomMeta } = useRace();
+  const { lastResult, joinMatchmaking, roomMeta, requestRematch } = useRace();
 
   const finalWpm = lastResult?.wpm ?? propWpm ?? 132;
   const finalAcc = lastResult?.accuracy ?? propAcc ?? 98;
@@ -47,6 +47,7 @@ export const Screen16RaceResults: React.FC<Screen16RaceResultsProps> = ({
 
   const handlePlayAgain = () => {
     if (roomMeta?.isPrivate) {
+      requestRematch();
       onNavigate('screen-18');
     } else {
       joinMatchmaking();

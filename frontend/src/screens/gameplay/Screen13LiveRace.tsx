@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { Trophy, Volume2, VolumeX, Eye, Flag, Zap, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Trophy, Volume2, VolumeX, Eye, Flag, Zap, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { useRace } from '../../context/RaceContext';
 import { useAuth } from '../../context/AuthContext';
 import { recordKeystroke } from '../../services/telemetryService';
+import { computeTypingState } from '../../services/typingEngine';
+import { TRACKS_DATA } from '../../data/carsData';
 
 interface Screen13LiveRaceProps {
   onNavigate: (screenId: string) => void;
@@ -16,24 +18,23 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
   passageText: propPassageText
 }: Screen13LiveRaceProps) => {
   const { user } = useAuth();
-  const { passageText: racePassage, players, sendProgress, submitFinalRace } = useRace();
+  const { passageText: racePassage, players, sendProgress, submitFinalRace, roomMeta } = useRace();
   
+  const currentTrack = TRACKS_DATA.find(t => t.id === roomMeta?.trackId) || TRACKS_DATA[0];
   const activePassage = propPassageText || racePassage || "The quick brown fox jumps over the lazy dog while sports cars thunder down the championship asphalt highway at breakneck velocity.";
 
   const [typedInput, setTypedInput] = useState('');
-  const [errorIndex, setErrorIndex] = useState<number | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [wpm, setWpm] = useState(0);
-  const [accuracy, setAccuracy] = useState(100);
   const [totalKeystrokes, setTotalKeystrokes] = useState(0);
   const [correctKeystrokes, setCorrectKeystrokes] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [isFocused, setIsFocused] = useState(true);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const raceStartTimeRef = useRef<number>(Date.now());
 
-  // Auto focus input on mount
+  // Focus input on mount & reset start time
   useEffect(() => {
     inputRef.current?.focus();
     raceStartTimeRef.current = Date.now();
@@ -48,82 +49,115 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Global keydown capture: if user types anywhere on screen, focus the input
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Tab' || e.key === 'Escape') return;
+
+      if (document.activeElement !== inputRef.current && (e.key.length === 1 || e.key === 'Backspace')) {
+        inputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
   const equippedItem = user?.inventory?.find(i => i.isEquipped);
   const userCarId: CarModelId = (equippedItem?.itemId as CarModelId) || 'blaze';
   const userNickname = user?.profile?.nickname || 'You';
 
-  // Handle Keystrokes
+  // Compute live character-by-character typing state
+  const typingState = computeTypingState(
+    activePassage,
+    typedInput,
+    totalKeystrokes,
+    correctKeystrokes,
+    elapsedSeconds
+  );
+
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
+  const isOpponent = (p: (typeof players)[0]) => {
+    if (p.socketId === 'local_you') return false;
+    if (user?.id && p.userId === user.id) return false;
+    return true;
+  };
+
+  // Check if finished
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isFinishing) return;
     const val = e.target.value;
-    const targetSlice = activePassage.slice(0, val.length);
 
-    setTotalKeystrokes(prev => prev + 1);
+    let newTotal = totalKeystrokes;
+    let newCorrect = correctKeystrokes;
 
-    if (val === targetSlice) {
-      setTypedInput(val);
-      setErrorIndex(null);
-      setCorrectKeystrokes(prev => prev + 1);
+    if (val.length > typedInput.length) {
+      // Keystroke typed
+      const charIndex = val.length - 1;
+      const typedChar = val[charIndex];
+      const expectedChar = activePassage[charIndex] || '';
+      const isMatch = typedChar === expectedChar;
 
-      // Record accurate keystroke in telemetry
-      if (val.length > 0) {
-        recordKeystroke(val[val.length - 1], false);
+      newTotal += 1;
+      setTotalKeystrokes(newTotal);
+
+      if (isMatch) {
+        newCorrect += 1;
+        setCorrectKeystrokes(newCorrect);
       }
 
-      // Compute Live WPM
-      const elapsedMinutes = Math.max(0.05, elapsedSeconds / 60);
-      const calculatedWpm = Math.round((val.length / 5) / elapsedMinutes);
-      if (calculatedWpm > 0) setWpm(calculatedWpm);
-
-      // Compute Accuracy
-      const currentAcc = Math.round(((correctKeystrokes + 1) / (totalKeystrokes + 1)) * 100);
-      const normalizedAcc = Math.min(100, Math.max(50, currentAcc));
-      setAccuracy(normalizedAcc);
-
-      const userProg = (val.length / activePassage.length) * 100;
-      sendProgress(userProg, calculatedWpm, normalizedAcc);
-
-      // Check if finished!
-      if (val.length >= activePassage.length) {
-        setIsFinishing(true);
-
-        // Calculate placement
-        const fasterOpponents = players.filter(p => p.userId !== user?.id && p.finished).length;
-        const finalPlace = fasterOpponents + 1;
-
-        try {
-          await submitFinalRace({
-            wpm: calculatedWpm,
-            accuracy: normalizedAcc,
-            durationSec: Math.max(1, elapsedSeconds),
-            place: finalPlace
-          });
-        } catch {
-          // Fallback
-        }
-
-        setTimeout(() => {
-          onNavigate('screen-16'); // Transition to podium celebration!
-        }, 500);
-      }
-    } else {
-      // Keystroke error! Log missed key in telemetry
-      const expectedChar = activePassage[typedInput.length] || '';
       if (expectedChar) {
-        recordKeystroke(expectedChar, true);
+        recordKeystroke(expectedChar, !isMatch);
       }
-      setErrorIndex(val.length - 1);
+    } else if (val.length < typedInput.length) {
+      // Backspace: naturally update text
+    }
+
+    setTypedInput(val);
+
+    // Compute next state for socket emission
+    const nextState = computeTypingState(
+      activePassage,
+      val,
+      newTotal,
+      newCorrect,
+      elapsedSeconds
+    );
+
+    sendProgress(nextState.progressPercent, nextState.wpm, nextState.accuracy);
+
+    // Check if finished
+    if (nextState.isComplete && !isFinishing) {
+      setIsFinishing(true);
+
+      const fasterOpponents = players.filter(p => isOpponent(p) && p.finished).length;
+      const finalPlace = fasterOpponents + 1;
+
+      try {
+        await submitFinalRace({
+          wpm: nextState.wpm,
+          accuracy: nextState.accuracy,
+          durationSec: Math.max(1, elapsedSeconds),
+          place: finalPlace
+        });
+      } catch {
+        // Fallback
+      }
+
+      setTimeout(() => {
+        onNavigate('screen-16'); // Transition to podium celebration!
+      }, 500);
     }
   };
 
-  const userProgress = (typedInput.length / activePassage.length) * 100;
-
-  // Split passage text for visual highlight
-  const currentTypedPart = activePassage.slice(0, typedInput.length);
-  const remainingPart = activePassage.slice(typedInput.length);
+  const userProgress = typingState.progressPercent;
 
   // Separate user and opponents
-  const opponentRacers = players.filter(p => p.userId !== user?.id && p.socketId !== p.userId);
+  const opponentRacers = players.filter(isOpponent);
   const defaultOpponents = [
     { socketId: 'opp_1', userId: 'opp_1', nickname: 'Emma', carId: 'golden', avatar: '👩‍🦰', progress: Math.min(95, elapsedSeconds * 3.8), wpm: 122, accuracy: 98, finished: false },
     { socketId: 'opp_2', userId: 'opp_2', nickname: 'Liam', carId: 'forest', avatar: '👱‍♂️', progress: Math.min(90, elapsedSeconds * 3.2), wpm: 115, accuracy: 96, finished: false },
@@ -147,52 +181,136 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
 
   const userRank = allRacers.findIndex(r => r.isYou) + 1;
 
+  const formattedTime = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
+
   return (
-    <div className="screen-page live-race-screen" onClick={() => inputRef.current?.focus()}>
+    <div className="screen-page live-race-screen" onClick={focusInput}>
       <div className="content-wrapper race-canvas-wrapper">
         
         {/* TOP PASSAGE & RACE BAR */}
         <div className="race-top-card card">
-          <div className="passage-header-row">
-            <div className="lap-counter-pill">
-              <span>Position: #{userRank} / {allRacers.length}</span>
-            </div>
-
-            {/* TYPING PASSAGE DISPLAY */}
-            <div className="passage-typing-display">
-              <span className="typed-completed-badge">{currentTypedPart}</span>
-              <span className="blinking-cursor">|</span>
-              <span className="typed-remaining-text">{remainingPart}</span>
-            </div>
-
-            {/* RACE TIMER */}
-            <div className="race-timer-pill">
-              <span className="timer-icon">⏱️</span>
-              <span className="timer-digits">
-                {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:
-                {String(elapsedSeconds % 60).padStart(2, '0')}
+          {/* Status Bar */}
+          <div className="race-status-bar">
+            <div className="flex-center gap-2">
+              <div className="lap-counter-pill">
+                <span>Position: #{userRank} / {allRacers.length}</span>
+              </div>
+              <span className="badge badge-blue flex-center gap-1" title={currentTrack.description}>
+                <span>🏁</span>
+                <span>{currentTrack.name}</span>
               </span>
+              <span className="badge badge-orange font-mono font-bold">
+                {typingState.wpm} WPM
+              </span>
+              <span className="badge badge-green font-mono font-bold">
+                {typingState.accuracy}% ACC
+              </span>
+            </div>
+
+            <div className="flex-center gap-2">
+              {typingState.hasError && (
+                <div className="typo-warning-pill animate-pulse">
+                  <AlertTriangle size={13} />
+                  <span>Backspace to fix typo</span>
+                </div>
+              )}
+              <div className="race-timer-pill">
+                <span className="timer-icon">⏱️</span>
+                <span className="timer-digits">{formattedTime}</span>
+              </div>
             </div>
           </div>
 
-          {/* Hidden real input capturing user typing */}
-          <input 
-            ref={inputRef}
-            type="text" 
-            className="hidden-typing-input"
-            value={typedInput}
-            onChange={handleInputChange}
-            autoFocus
-            aria-label="Type race passage"
-          />
+          {/* DEDICATED, SPACIOUS TYPING ARENA */}
+          <div 
+            className={`race-passage-card ${isFocused ? 'focused' : ''} ${typingState.hasError ? 'has-error' : ''}`}
+            onClick={focusInput}
+          >
+            {!isFocused && (
+              <div className="typing-focus-reminder">
+                Click here or start typing to resume
+              </div>
+            )}
+
+            {/* Character-by-Character Flow */}
+            <div className="passage-char-flow">
+              {typingState.diff.map((char) => {
+                const isSpace = char.expected === ' ';
+                if (char.status === 'correct') {
+                  return (
+                    <span key={char.index} className="char char-correct">
+                      {char.expected}
+                    </span>
+                  );
+                }
+                if (char.status === 'incorrect') {
+                  return (
+                    <span 
+                      key={char.index} 
+                      className="char char-incorrect"
+                      title={`Typo: typed '${char.typed || ''}', expected '${char.expected}'`}
+                    >
+                      {isSpace ? '␣' : (char.typed || char.expected)}
+                    </span>
+                  );
+                }
+                if (char.status === 'current') {
+                  return (
+                    <span key={char.index} className="char char-current">
+                      <span className="cursor-caret" />
+                      {char.expected}
+                    </span>
+                  );
+                }
+                return (
+                  <span key={char.index} className="char char-upcoming">
+                    {char.expected}
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* Native Full-Coverage Overlay Input */}
+            <input 
+              ref={inputRef}
+              type="text" 
+              className="passage-native-input"
+              value={typedInput}
+              onChange={handleInputChange}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              aria-label="Type race passage"
+            />
+          </div>
         </div>
 
         {/* 3D CARTOON MULTI-LANE TRACK SCENE */}
-        <div className="race-track-viewport">
+        <div 
+          className="race-track-viewport"
+          style={{
+            borderColor: currentTrack.accentColor ? `${currentTrack.accentColor}66` : undefined
+          }}
+        >
           <img 
             src="/assets/race_track.jpg" 
-            alt="Multi-lane asphalt racing highway through green sunny valley" 
+            alt={`${currentTrack.name} multi-lane asphalt racing highway`} 
             className="race-track-bg-img"
+          />
+          <div 
+            className="track-atmosphere-overlay"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: currentTrack.bgGradient,
+              opacity: 0.14,
+              pointerEvents: 'none',
+              mixBlendMode: 'color'
+            }}
           />
 
           {/* Floating Player Rankings Panel (Right Side) */}
@@ -205,7 +323,7 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
                 <span className="standing-rank">#{idx + 1}</span>
                 <span className="standing-avatar">{racer.avatar}</span>
                 <span className="standing-name">{racer.name}</span>
-                {racer.isYou && <span className="standing-wpm">{wpm} WPM</span>}
+                {racer.isYou && <span className="standing-wpm">{typingState.wpm} WPM</span>}
               </div>
             ))}
           </div>
@@ -246,7 +364,7 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
             </div>
             <div className="hud-metric-block">
               <div className="hud-wpm-text">
-                <span className="hud-wpm-num">{wpm}</span>
+                <span className="hud-wpm-num">{typingState.wpm}</span>
                 <span className="hud-wpm-unit">WPM</span>
               </div>
               <div className="hud-sub-label">Current Net Velocity</div>
@@ -255,7 +373,7 @@ export const Screen13LiveRace: React.FC<Screen13LiveRaceProps> = ({
             <div className="hud-divider" />
 
             <div className="hud-metric-block">
-              <div className="hud-acc-text text-green">{accuracy}%</div>
+              <div className="hud-acc-text text-green">{typingState.accuracy}%</div>
               <div className="hud-sub-label">Keystroke Accuracy</div>
             </div>
 

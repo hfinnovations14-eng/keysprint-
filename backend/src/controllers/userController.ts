@@ -26,16 +26,68 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export interface CatalogItem {
+  id: string;
+  name: string;
+  price: number;
+  itemType: 'car' | 'trail' | 'bundle';
+  category: 'Common' | 'Rare' | 'Epic' | 'Legendary';
+  bundledItems?: Array<{ itemId: string; itemType: string }>;
+}
+
+export const ITEM_CATALOG: Record<string, CatalogItem> = {
+  // Vehicles
+  starter: { id: 'starter', name: 'Starter Car', price: 0, itemType: 'car', category: 'Common' },
+  blaze: { id: 'blaze', name: 'Blaze Runner', price: 1200, itemType: 'car', category: 'Rare' },
+  golden: { id: 'golden', name: 'Golden Flash', price: 1800, itemType: 'car', category: 'Epic' },
+  neon: { id: 'neon', name: 'Neon Rider', price: 2000, itemType: 'car', category: 'Epic' },
+  shadow: { id: 'shadow', name: 'Shadow X', price: 2500, itemType: 'car', category: 'Legendary' },
+  ice: { id: 'ice', name: 'Ice Drift', price: 1400, itemType: 'car', category: 'Rare' },
+  forest: { id: 'forest', name: 'Forest Beast', price: 1500, itemType: 'car', category: 'Rare' },
+  rose: { id: 'rose', name: 'Rose Racer', price: 1900, itemType: 'car', category: 'Epic' },
+  retro: { id: 'retro', name: 'Retro Classic', price: 2200, itemType: 'car', category: 'Epic' },
+  jeep: { id: 'jeep', name: 'Jeep Pioneer', price: 1600, itemType: 'car', category: 'Common' },
+
+  // Nitro Trails
+  'trail-nitro-cyan': { id: 'trail-nitro-cyan', name: 'Frostbite Vapor Trail', price: 600, itemType: 'trail', category: 'Rare' },
+  'trail-solar-gold': { id: 'trail-solar-gold', name: 'Hypernova Golden Flare', price: 900, itemType: 'trail', category: 'Epic' },
+  'trail-void-purple': { id: 'trail-void-purple', name: 'Singularity Drift Smoke', price: 1200, itemType: 'trail', category: 'Legendary' },
+
+  // Special Bundles
+  'bundle-racing-legend': {
+    id: 'bundle-racing-legend',
+    name: 'Racing Legend Pack (Bundle)',
+    price: 3500,
+    itemType: 'bundle',
+    category: 'Legendary',
+    bundledItems: [
+      { itemId: 'blaze', itemType: 'car' },
+      { itemId: 'golden', itemType: 'car' },
+      { itemId: 'shadow', itemType: 'car' },
+      { itemId: 'trail-void-purple', itemType: 'trail' }
+    ]
+  }
+};
+
 export const purchaseItem = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { itemId, itemType = 'car', cost } = req.body;
+    const { itemId } = req.body;
 
-    if (!itemId || cost === undefined) {
-      return res.status(400).json({ error: 'itemId and cost required' });
+    if (!itemId || typeof itemId !== 'string') {
+      return res.status(400).json({ error: 'Valid itemId required' });
     }
+
+    const catalogItem = ITEM_CATALOG[itemId];
+    if (!catalogItem) {
+      return res.status(404).json({ error: `Item '${itemId}' not found in catalog` });
+    }
+
+    // Authoritative server-side price and item type (never trust client cost)
+    const cost = catalogItem.price;
+    const itemType = catalogItem.itemType;
 
     const transaction = await prisma.$transaction(async (tx) => {
       const stats = await tx.playerStats.findUnique({ where: { userId } });
@@ -43,26 +95,57 @@ export const purchaseItem = async (req: AuthRequest, res: Response) => {
         throw new Error('INSUFFICIENT_FUNDS');
       }
 
-      const existing = await tx.inventoryItem.findUnique({
-        where: { userId_itemId: { userId, itemId } }
-      });
-      if (existing) {
-        throw new Error('ALREADY_OWNED');
+      let grantedItem = null;
+
+      if (itemType === 'bundle' && catalogItem.bundledItems) {
+        // Verify user doesn't already own all bundled items
+        const ownedItems = await tx.inventoryItem.findMany({
+          where: {
+            userId,
+            itemId: { in: catalogItem.bundledItems.map(b => b.itemId) }
+          }
+        });
+
+        if (ownedItems.length === catalogItem.bundledItems.length) {
+          throw new Error('ALREADY_OWNED');
+        }
+
+        const ownedItemIds = new Set(ownedItems.map(o => o.itemId));
+        for (const item of catalogItem.bundledItems) {
+          if (!ownedItemIds.has(item.itemId)) {
+            await tx.inventoryItem.create({
+              data: {
+                userId,
+                itemId: item.itemId,
+                itemType: item.itemType,
+                isEquipped: false
+              }
+            });
+          }
+        }
+        grantedItem = { itemId, itemType, name: catalogItem.name };
+      } else {
+        const existing = await tx.inventoryItem.findUnique({
+          where: { userId_itemId: { userId, itemId } }
+        });
+        if (existing) {
+          throw new Error('ALREADY_OWNED');
+        }
+
+        grantedItem = await tx.inventoryItem.create({
+          data: {
+            userId,
+            itemId,
+            itemType,
+            isEquipped: false
+          }
+        });
       }
 
       const updatedCoins = stats.coins - cost;
       await tx.playerStats.update({
         where: { userId },
         data: { coins: updatedCoins }
-      });
-
-      const newItem = await tx.inventoryItem.create({
-        data: {
-          userId,
-          itemId,
-          itemType,
-          isEquipped: false
-        }
       });
 
       await tx.walletTransaction.create({
@@ -74,7 +157,7 @@ export const purchaseItem = async (req: AuthRequest, res: Response) => {
         }
       });
 
-      return { newItem, coins: updatedCoins };
+      return { newItem: grantedItem, coins: updatedCoins };
     });
 
     return res.json({
@@ -86,8 +169,8 @@ export const purchaseItem = async (req: AuthRequest, res: Response) => {
     if (error.message === 'INSUFFICIENT_FUNDS') {
       return res.status(400).json({ error: 'Insufficient KeySprint coins' });
     }
-    if (error.message === 'ALREADY_OWNED') {
-      return res.status(400).json({ error: 'Item is already in your garage' });
+    if (error.message === 'ALREADY_OWNED' || error.code === 'P2002') {
+      return res.status(400).json({ error: 'Item is already owned' });
     }
     console.error('Purchase error:', error);
     return res.status(500).json({ error: 'Failed to process purchase' });
@@ -101,20 +184,57 @@ export const equipItem = async (req: AuthRequest, res: Response) => {
 
     const { itemId, itemType = 'car' } = req.body;
 
+    if (!itemId || typeof itemId !== 'string') {
+      return res.status(400).json({ error: 'Valid itemId required' });
+    }
+
     await prisma.$transaction(async (tx) => {
+      let userItem = await tx.inventoryItem.findUnique({
+        where: { userId_itemId: { userId, itemId } }
+      });
+
+      // Free starter car reconciliation: auto-grant starter if user doesn't have it yet
+      if (!userItem) {
+        if (itemId === 'starter') {
+          userItem = await tx.inventoryItem.create({
+            data: {
+              userId,
+              itemId: 'starter',
+              itemType: 'car',
+              isEquipped: true
+            }
+          });
+        } else {
+          throw new Error('NOT_OWNED');
+        }
+      }
+
+      // Ensure item matches the requested equipment category
+      if (userItem.itemType !== itemType) {
+        throw new Error('INVALID_ITEM_TYPE');
+      }
+
+      // Un-equip any currently active item of this type
       await tx.inventoryItem.updateMany({
-        where: { userId, itemType },
+        where: { userId, itemType, isEquipped: true },
         data: { isEquipped: false }
       });
 
+      // Equip the target item
       await tx.inventoryItem.update({
         where: { userId_itemId: { userId, itemId } },
         data: { isEquipped: true }
       });
     });
 
-    return res.json({ message: 'Item equipped successfully', itemId });
+    return res.json({ message: 'Item equipped successfully', itemId, itemType });
   } catch (error: any) {
+    if (error.message === 'NOT_OWNED') {
+      return res.status(400).json({ error: 'You do not own this vehicle' });
+    }
+    if (error.message === 'INVALID_ITEM_TYPE') {
+      return res.status(400).json({ error: 'Item cannot be equipped in this slot' });
+    }
     console.error('Equip item error:', error);
     return res.status(500).json({ error: 'Failed to equip item' });
   }

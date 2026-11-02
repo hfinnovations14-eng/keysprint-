@@ -3,12 +3,26 @@ import { Play, Video, Users, Trophy, Sparkles, Gift, ShieldCheck, ChevronRight, 
 import { SvgCar } from '../../components/common/SvgCar';
 import { GLOBAL_LEADERBOARD } from '../../data/mockData';
 import { CARS_DATA } from '../../data/carsData';
+import { useAuth } from '../../context/AuthContext';
 
 interface Screen01HomepageProps {
   onNavigate: (screenId: string) => void;
 }
 
 export const Screen01Homepage: React.FC<Screen01HomepageProps> = ({ onNavigate }) => {
+  const { user, ensureGuestSession } = useAuth();
+
+  const handlePlayNow = async () => {
+    if (!user) {
+      try {
+        await ensureGuestSession();
+      } catch (err) {
+        console.warn('Guest session notice:', err);
+      }
+    }
+    onNavigate('screen-10');
+  };
+
   return (
     <div className="screen-page homepage-screen">
       {/* HERO SECTION */}
@@ -33,7 +47,7 @@ export const Screen01Homepage: React.FC<Screen01HomepageProps> = ({ onNavigate }
             <div className="hero-cta-group">
               <button 
                 className="btn btn-primary btn-lg"
-                onClick={() => onNavigate('screen-10')}
+                onClick={handlePlayNow}
               >
                 <Play size={20} fill="#FFFFFF" />
                 <span>Play Now</span>

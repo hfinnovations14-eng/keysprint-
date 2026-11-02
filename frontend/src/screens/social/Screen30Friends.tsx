@@ -120,6 +120,26 @@ export const Screen30Friends: React.FC<Screen30FriendsProps> = ({ onNavigate }) 
     }
   };
 
+  const handleRejectRequest = async (friendshipId: string, name: string) => {
+    try {
+      await api.rejectFriendRequest(friendshipId);
+      showNotification(`Declined friend request from ${name}`);
+      fetchFriends();
+    } catch (err: any) {
+      showNotification(err.message || 'Failed to decline request');
+    }
+  };
+
+  const handleBlockUser = async (targetUserId: string, name: string) => {
+    try {
+      await api.blockUser(targetUserId);
+      showNotification(`Blocked racer ${name}`);
+      fetchFriends();
+    } catch (err: any) {
+      showNotification(err.message || 'Failed to block user');
+    }
+  };
+
   const handleRemoveFriend = async (friendshipId: string, name: string) => {
     try {
       await api.removeFriend(friendshipId);
@@ -130,19 +150,23 @@ export const Screen30Friends: React.FC<Screen30FriendsProps> = ({ onNavigate }) 
     }
   };
 
-  const handleChallenge = (friend: FriendItem) => {
-    const roomCode = `SPRINT-${Math.floor(10 + Math.random() * 90)}`;
-    api.challengeFriend({ friendUserId: friend.id, roomCode }).catch(() => {});
+  const handleChallenge = async (friend: FriendItem) => {
+    try {
+      const res = await api.challengeFriend({ friendUserId: friend.id });
+      const roomCode = res.roomCode;
 
-    createPrivateRoom({
-      roomName: `${user?.profile?.nickname || 'Driver'} vs ${friend.name}`,
-      roomCode,
-      maxPlayers: 2,
-      trackId: 'green-valley',
-      fillWithBots: false
-    });
+      createPrivateRoom({
+        roomName: `${user?.profile?.nickname || 'Driver'} vs ${friend.name}`,
+        roomCode,
+        maxPlayers: 2,
+        trackId: 'green-valley',
+        fillWithBots: false
+      });
 
-    onNavigate('screen-18');
+      onNavigate('screen-18');
+    } catch (err: any) {
+      showNotification(err.message || 'Failed to send challenge');
+    }
   };
 
   const filteredFriends = friendsList.filter(f => 
@@ -273,13 +297,22 @@ export const Screen30Friends: React.FC<Screen30FriendsProps> = ({ onNavigate }) 
                       </button>
 
                       {f.friendshipId && (
-                        <button 
-                          className="btn btn-outline btn-sm text-muted"
-                          title="Remove Friend"
-                          onClick={() => handleRemoveFriend(f.friendshipId, f.name)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <>
+                          <button 
+                            className="btn btn-outline btn-sm text-muted"
+                            title="Remove Friend"
+                            onClick={() => handleRemoveFriend(f.friendshipId, f.name)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          <button 
+                            className="btn btn-outline btn-sm text-danger"
+                            title="Block User"
+                            onClick={() => handleBlockUser(f.id, f.name)}
+                          >
+                            <Shield size={14} />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -317,7 +350,7 @@ export const Screen30Friends: React.FC<Screen30FriendsProps> = ({ onNavigate }) 
                       </button>
                       <button 
                         className="btn btn-secondary btn-sm flex-center gap-1"
-                        onClick={() => handleRemoveFriend(req.friendshipId, req.name)}
+                        onClick={() => handleRejectRequest(req.friendshipId, req.name)}
                       >
                         <X size={14} />
                         <span>Decline</span>

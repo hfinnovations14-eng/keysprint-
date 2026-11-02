@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { X, Coins, CheckCircle, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
+import { X, Coins, CheckCircle, AlertTriangle, Sparkles, Loader2, Flame } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 
 interface Screen26PurchaseModalProps {
@@ -8,7 +8,10 @@ interface Screen26PurchaseModalProps {
     name: string;
     price: number;
     category: string;
+    id?: string;
     carId?: string;
+    itemId?: string;
+    itemType?: string;
     desc?: string;
   };
   userCoins: number;
@@ -73,9 +76,15 @@ export const Screen26PurchaseModal: React.FC<Screen26PurchaseModalProps> = ({
               <span className={`badge badge-${item.category.toLowerCase()}`}>{item.category} Tier</span>
             </div>
 
-            {/* Car Preview */}
+            {/* Item Preview */}
             <div className="modal-car-preview card-cream text-center py-3">
-              <SvgCar id={(item.carId as CarModelId) || 'starter'} size={180} />
+              {item.itemType === 'trail' ? (
+                <div className="flex-center py-4">
+                  <Flame size={72} className="text-orange" />
+                </div>
+              ) : (
+                <SvgCar id={(item.carId as CarModelId) || 'starter'} size={180} />
+              )}
             </div>
 
             {/* Error Message if Any */}

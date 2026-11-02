@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Bot, Play, ShieldAlert, Cpu, ArrowLeft } from 'lucide-react';
+import { Bot, Play, ShieldAlert, Cpu, ArrowLeft, Loader2 } from 'lucide-react';
 import { SvgCar } from '../../components/common/SvgCar';
+import { useRace } from '../../context/RaceContext';
 
 interface Screen15BotRaceProps {
   onNavigate: (screenId: string) => void;
@@ -8,6 +9,22 @@ interface Screen15BotRaceProps {
 
 export const Screen15BotRace: React.FC<Screen15BotRaceProps> = ({ onNavigate }) => {
   const [botDifficulty, setBotDifficulty] = useState<'easy' | 'normal' | 'advanced'>('normal');
+  const [isLaunching, setIsLaunching] = useState(false);
+  const { startBotRace } = useRace();
+
+  const handleLaunch = async () => {
+    if (isLaunching) return;
+    setIsLaunching(true);
+    try {
+      await startBotRace(botDifficulty);
+      onNavigate('screen-13');
+    } catch (err) {
+      console.error('Failed to launch bot race:', err);
+      onNavigate('screen-13');
+    } finally {
+      setIsLaunching(false);
+    }
+  };
 
   return (
     <div className="screen-page bot-race-screen">
@@ -31,7 +48,7 @@ export const Screen15BotRace: React.FC<Screen15BotRaceProps> = ({ onNavigate }) 
               <SvgCar id="jeep" size={120} />
               <h3>Easy Bots</h3>
               <p className="text-sm text-secondary">Cruising speed ~45–60 WPM. Occasional pauses to mimic rookie drivers.</p>
-              <span className="wpm-tag">Target: 55 WPM</span>
+              <span className="wpm-tag">Target: 52 WPM</span>
             </div>
 
             <div 
@@ -42,7 +59,7 @@ export const Screen15BotRace: React.FC<Screen15BotRaceProps> = ({ onNavigate }) 
               <SvgCar id="forest" size={120} />
               <h3>Normal Bots</h3>
               <p className="text-sm text-secondary">Consistent cadence ~90–115 WPM. Solid sparring partner for everyday practice.</p>
-              <span className="wpm-tag">Target: 105 WPM</span>
+              <span className="wpm-tag">Target: 104 WPM</span>
             </div>
 
             <div 
@@ -53,7 +70,7 @@ export const Screen15BotRace: React.FC<Screen15BotRaceProps> = ({ onNavigate }) 
               <SvgCar id="shadow" size={120} />
               <h3>Advanced Bots</h3>
               <p className="text-sm text-secondary">Laser-sharp ~140–165 WPM. Flawless rhythm pushing expert typists to the limit.</p>
-              <span className="wpm-tag">Target: 150 WPM</span>
+              <span className="wpm-tag">Target: 155 WPM</span>
             </div>
           </div>
 
@@ -61,15 +78,26 @@ export const Screen15BotRace: React.FC<Screen15BotRaceProps> = ({ onNavigate }) 
           <div className="text-center mt-5">
             <button 
               className="btn btn-primary btn-lg"
-              onClick={() => onNavigate('screen-13')}
+              onClick={handleLaunch}
+              disabled={isLaunching}
             >
-              <Play size={20} fill="#FFFFFF" />
-              <span>Launch Race Against {botDifficulty.toUpperCase()} Bots</span>
+              {isLaunching ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span>Preparing Grid & Passage...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={20} fill="#FFFFFF" />
+                  <span>Launch Race Against {botDifficulty.toUpperCase()} Bots</span>
+                </>
+              )}
             </button>
             <div className="mt-2">
               <button 
                 className="btn btn-outline btn-sm"
                 onClick={() => onNavigate('screen-10')}
+                disabled={isLaunching}
               >
                 <ArrowLeft size={16} />
                 <span>Change Mode</span>

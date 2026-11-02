@@ -84,17 +84,33 @@ const AppContent: React.FC = () => {
   const [currentScreenId, setCurrentScreenId] = useState<string>('screen-01');
   const [viewport, setViewport] = useState<ViewportMode>('desktop');
 
-  const liveCoins = user?.stats?.coins ?? 2450;
-  const liveLevel = user?.stats?.level ?? 12;
+  // Handle URL invite parameter ?room=CODE
+  const inviteHandledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (inviteHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const roomCodeParam = params.get('room');
+    if (roomCodeParam) {
+      inviteHandledRef.current = true;
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+
+      joinPrivateRoom(roomCodeParam).then((res) => {
+        if (res.success) {
+          setCurrentScreenId('screen-18');
+        } else {
+          setCurrentScreenId('screen-17');
+        }
+      });
+    }
+  }, [joinPrivateRoom]);
+
+  const liveCoins = user?.stats?.coins ?? 0;
+  const liveLevel = user?.stats?.level ?? 1;
   const equippedCarItem = user?.inventory?.find(i => i.isEquipped);
   const liveEquippedCar: CarModelId = (equippedCarItem?.itemId as CarModelId) || 'blaze';
 
   const isAdminScreen = currentScreenId.startsWith('admin-');
-
-  // Handle Coin deductions from shop
-  const handlePurchaseItem = (cost: number) => {
-    updateCoins(Math.max(0, liveCoins - cost));
-  };
 
   // Render Screen Content
   const renderScreen = () => {
@@ -181,7 +197,6 @@ const AppContent: React.FC = () => {
           <Screen24Garage 
             onNavigate={setCurrentScreenId}
             equippedCarId={liveEquippedCar}
-            onEquipCar={(id: CarModelId) => equipCar(id)}
           />
         );
       case 'screen-25':
@@ -189,7 +204,6 @@ const AppContent: React.FC = () => {
           <Screen25Shop 
             onNavigate={setCurrentScreenId}
             coins={liveCoins}
-            onPurchaseItem={handlePurchaseItem}
           />
         );
       case 'screen-26':

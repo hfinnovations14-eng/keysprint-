@@ -2,7 +2,7 @@ import * as React from 'react';
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { getSocket, connectSocket, disconnectSocket } from '../services/socket';
 import { useAuth } from './AuthContext';
-import { api } from '../services/api';
+import { api, getAuthToken } from '../services/api';
 
 export interface RacePlayer {
   socketId: string;
@@ -29,6 +29,7 @@ export interface RoomMeta {
   maxPlayers: number;
   trackId: string;
   fillWithBots: boolean;
+  botDifficulty?: 'easy' | 'normal' | 'advanced';
 }
 
 export interface RaceResultSummary {
@@ -77,10 +78,13 @@ interface RaceContextType {
     maxPlayers: number;
     trackId: string;
     fillWithBots: boolean;
+    botDifficulty?: 'easy' | 'normal' | 'advanced';
   }) => void;
   joinPrivateRoom: (roomCode: string) => Promise<{ success: boolean; message?: string }>;
   toggleReady: () => void;
   startPrivateRace: () => void;
+  requestRematch: () => void;
+  startBotRace: (difficulty?: 'easy' | 'normal' | 'advanced') => Promise<void>;
   leaveRoom: () => void;
   sendProgress: (progress: number, wpm: number, accuracy: number) => void;
   submitFinalRace: (stats: { wpm: number; accuracy: number; durationSec: number; place: number }) => Promise<RaceResultSummary>;
@@ -92,7 +96,7 @@ const DEFAULT_PASSAGE = "The quick brown fox jumps over the lazy dog while sport
 const RaceContext = createContext<RaceContextType | undefined>(undefined);
 
 export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { children: ReactNode }) => {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, ensureGuestSession } = useAuth();
   const [roomId, setRoomId] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomMeta, setRoomMeta] = useState<RoomMeta | null>(null);
@@ -105,14 +109,20 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
   const [incomingChallenge, setIncomingChallenge] = useState<IncomingChallenge | null>(null);
 
   const socketRef = useRef(getSocket());
+  const botIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const s = connectSocket();
     socketRef.current = s;
 
-    if (user?.id) {
-      s.emit('user.register', { userId: user.id });
-    }
+    const handleRegister = () => {
+      if (user?.id) {
+        s.emit('user.register', { userId: user.id });
+      }
+    };
+
+    handleRegister();
+    s.on('connect', handleRegister);
 
     s.on('social.challenge_received', (data: IncomingChallenge) => {
       setIncomingChallenge(data);
@@ -127,6 +137,7 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       maxPlayers?: number;
       trackId?: string;
       fillWithBots?: boolean;
+      botDifficulty?: 'easy' | 'normal' | 'advanced';
       status: any;
       passageText: string;
       players: RacePlayer[];
@@ -149,8 +160,17 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
         isHost,
         maxPlayers: data.maxPlayers || 4,
         trackId: data.trackId || 'green-valley',
-        fillWithBots: data.fillWithBots ?? true
+        fillWithBots: data.fillWithBots ?? true,
+        botDifficulty: data.botDifficulty || 'normal'
       });
+    });
+
+    s.on('room.rematch_ready', (data: { room?: any }) => {
+      setRoomStatus('waiting');
+      setCountdown(3);
+      setLastResult(null);
+      if (data.room?.passageText) setPassageText(data.room.passageText);
+      if (data.room?.players) setPlayers(data.room.players);
     });
 
     s.on('room.error', (data: { message: string }) => {
@@ -173,7 +193,9 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     });
 
     return () => {
+      s.off('connect', handleRegister);
       s.off('room.update');
+      s.off('room.rematch_ready');
       s.off('room.error');
       s.off('match.countdown');
       s.off('match.start');
@@ -198,9 +220,22 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     return { carId, nickname, avatar, userId: user?.id };
   };
 
-  const joinMatchmaking = (targetRoomId?: string) => {
+  const joinMatchmaking = async (targetRoomId?: string) => {
+    let currentUser = user;
+    if (!currentUser && !getAuthToken()) {
+      try {
+        currentUser = await ensureGuestSession();
+      } catch (e) {
+        console.warn('Guest initialization error:', e);
+      }
+    }
+
     const s = connectSocket();
-    const { carId, nickname, avatar, userId } = getDriverPayload();
+    const equippedItem = currentUser?.inventory?.find(i => i.isEquipped);
+    const carId = equippedItem?.itemId || 'blaze';
+    const nickname = currentUser?.profile?.nickname || `Driver_${Math.floor(1000 + Math.random() * 9000)}`;
+    const avatar = currentUser?.profile?.avatarId || '🏎️';
+    const userId = currentUser?.id;
 
     setRoomStatus('waiting');
     setCountdown(3);
@@ -215,15 +250,29 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     });
   };
 
-  const createPrivateRoom = (options: {
+  const createPrivateRoom = async (options: {
     roomName: string;
     roomCode: string;
     maxPlayers: number;
     trackId: string;
     fillWithBots: boolean;
+    botDifficulty?: 'easy' | 'normal' | 'advanced';
   }) => {
+    let currentUser = user;
+    if (!currentUser && !getAuthToken()) {
+      try {
+        currentUser = await ensureGuestSession();
+      } catch (e) {
+        console.warn('Guest initialization error for create room:', e);
+      }
+    }
+
     const s = connectSocket();
-    const { carId, nickname, avatar, userId } = getDriverPayload();
+    const equippedItem = currentUser?.inventory?.find(i => i.isEquipped);
+    const carId = equippedItem?.itemId || 'blaze';
+    const nickname = currentUser?.profile?.nickname || `Driver_${Math.floor(1000 + Math.random() * 9000)}`;
+    const avatar = currentUser?.profile?.avatarId || '🏎️';
+    const userId = currentUser?.id;
 
     setRoomStatus('waiting');
     setCountdown(3);
@@ -238,7 +287,8 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       roomCode: options.roomCode,
       maxPlayers: options.maxPlayers,
       trackId: options.trackId,
-      fillWithBots: options.fillWithBots
+      fillWithBots: options.fillWithBots,
+      botDifficulty: options.botDifficulty || 'normal'
     });
   };
 
@@ -249,9 +299,22 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       return { success: false, message: 'Please enter a valid room code.' };
     }
 
+    let currentUser = user;
+    if (!currentUser && !getAuthToken()) {
+      try {
+        currentUser = await ensureGuestSession();
+      } catch (e) {
+        console.warn('Guest initialization error for join room:', e);
+      }
+    }
+
     setRoomError(null);
     const s = connectSocket();
-    const { carId, nickname, avatar, userId } = getDriverPayload();
+    const equippedItem = currentUser?.inventory?.find(i => i.isEquipped);
+    const carId = equippedItem?.itemId || 'blaze';
+    const nickname = currentUser?.profile?.nickname || `Driver_${Math.floor(1000 + Math.random() * 9000)}`;
+    const avatar = currentUser?.profile?.avatarId || '🏎️';
+    const userId = currentUser?.id;
 
     return new Promise((resolve) => {
       const errorHandler = (data: { message: string }) => {
@@ -300,8 +363,138 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     s.emit('room.host_start', { roomId });
   };
 
+  const requestRematch = () => {
+    if (!roomId) return;
+    const s = getSocket();
+    s.emit('room.rematch', { roomId });
+  };
+
+  const startBotRace = async (difficulty: 'easy' | 'normal' | 'advanced' = 'normal') => {
+    let currentUser = user;
+    if (!currentUser && !getAuthToken()) {
+      try {
+        currentUser = await ensureGuestSession();
+      } catch (e) {
+        console.warn('Guest initialization error for bot match:', e);
+      }
+    }
+
+    let text = DEFAULT_PASSAGE;
+    try {
+      const res = await api.getPassage(difficulty);
+      if (res.passage && res.passage.text) {
+        text = res.passage.text;
+      }
+    } catch {
+      // fallback
+    }
+    setPassageText(text);
+
+    const botProfiles = difficulty === 'easy'
+      ? [
+          { name: 'Turbo Bot [AI]', carId: 'jeep', avatar: '🤖', baseWpm: 52 },
+          { name: 'Rookie Drift [AI]', carId: 'starter', avatar: '🏎️', baseWpm: 48 },
+          { name: 'Cadence Cruiser [AI]', carId: 'forest', avatar: '⚡', baseWpm: 56 }
+        ]
+      : difficulty === 'advanced'
+      ? [
+          { name: 'Nitro Nova [AI]', carId: 'shadow', avatar: '🚀', baseWpm: 148 },
+          { name: 'SpeedMaster AI [AI]', carId: 'golden', avatar: '👑', baseWpm: 154 },
+          { name: 'Apex Predator [AI]', carId: 'neon', avatar: '⚡', baseWpm: 162 }
+        ]
+      : [
+          { name: 'Apex AI [AI]', carId: 'golden', avatar: '⚡', baseWpm: 104 },
+          { name: 'Turbo Bot [AI]', carId: 'blaze', avatar: '🤖', baseWpm: 96 },
+          { name: 'Drift Bot [AI]', carId: 'forest', avatar: '🏎️', baseWpm: 110 }
+        ];
+
+    const equippedItem = currentUser?.inventory?.find(i => i.isEquipped);
+    const userCar = (equippedItem?.itemId as string) || 'blaze';
+    const userNick = currentUser?.profile?.nickname || 'You';
+    const userAvatar = currentUser?.profile?.avatarId || '🏎️';
+
+    const playerRacers: RacePlayer[] = [
+      {
+        socketId: 'local_you',
+        userId: currentUser?.id || 'you',
+        nickname: userNick,
+        carId: userCar,
+        avatar: userAvatar,
+        progress: 0,
+        wpm: 0,
+        accuracy: 100,
+        finished: false
+      },
+      ...botProfiles.map((b, idx) => ({
+        socketId: `bot_${idx + 1}`,
+        userId: `bot_${idx + 1}`,
+        nickname: b.name,
+        carId: b.carId,
+        avatar: b.avatar,
+        progress: 0,
+        wpm: b.baseWpm,
+        accuracy: 98,
+        finished: false,
+        isBot: true
+      }))
+    ];
+
+    const botRoomId = `room_bot_${Date.now()}`;
+    setRoomId(botRoomId);
+    setRoomCode(null);
+    setRoomStatus('racing');
+    setCountdown(0);
+    setPlayers(playerRacers);
+    setRoomMeta({
+      roomId: botRoomId,
+      isPrivate: false,
+      isHost: true,
+      maxPlayers: 4,
+      trackId: 'green-valley',
+      fillWithBots: false
+    });
+
+    const totalWords = Math.max(5, text.trim().split(/\s+/).length);
+
+    if (botIntervalRef.current) clearInterval(botIntervalRef.current);
+    botIntervalRef.current = setInterval(() => {
+      setPlayers(prevPlayers => {
+        let anyUpdated = false;
+        const updated = prevPlayers.map(p => {
+          if (p.isBot && !p.finished) {
+            anyUpdated = true;
+            // Realistic progression: words typed per sec / totalWords * 100
+            // Include slight humanized jitter (+/- 5%)
+            const wordsPerSec = (p.wpm / 60) * (0.95 + Math.random() * 0.1);
+            const step = (wordsPerSec / totalWords) * 100;
+            const newProgress = Math.min(100, Math.round((p.progress + step) * 10) / 10);
+            const finished = newProgress >= 100;
+            return {
+              ...p,
+              progress: newProgress,
+              finished
+            };
+          }
+          return p;
+        });
+
+        const allFinished = updated.filter(p => p.isBot).every(p => p.finished);
+        if (allFinished && botIntervalRef.current) {
+          clearInterval(botIntervalRef.current);
+          botIntervalRef.current = null;
+        }
+
+        return anyUpdated ? updated : prevPlayers;
+      });
+    }, 1000);
+  };
+
   const leaveRoom = () => {
-    if (roomId) {
+    if (botIntervalRef.current) {
+      clearInterval(botIntervalRef.current);
+      botIntervalRef.current = null;
+    }
+    if (roomId && !roomId.startsWith('room_bot_')) {
       const s = getSocket();
       s.emit('room.leave', { roomId });
     }
@@ -320,6 +513,21 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
 
   const sendProgress = (progress: number, wpm: number, accuracy: number) => {
     if (!roomId) return;
+    if (roomId.startsWith('room_bot_')) {
+      setPlayers(prev => prev.map(p => {
+        if (!p.isBot) {
+          return {
+            ...p,
+            progress,
+            wpm,
+            accuracy,
+            finished: progress >= 100
+          };
+        }
+        return p;
+      }));
+      return;
+    }
     const s = getSocket();
     s.emit('progress.update', {
       roomId,
@@ -330,24 +538,47 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
   };
 
   const submitFinalRace = async (stats: { wpm: number; accuracy: number; durationSec: number; place: number }) => {
+    if (botIntervalRef.current) {
+      clearInterval(botIntervalRef.current);
+      botIntervalRef.current = null;
+    }
+
+    if (!getAuthToken()) {
+      try {
+        await ensureGuestSession();
+      } catch (e) {
+        console.warn('Guest auto-session on submit notice:', e);
+      }
+    }
+
     const min = Math.floor(stats.durationSec / 60);
     const sec = Math.floor(stats.durationSec % 60);
     const formattedTime = `${min < 10 ? '0' : ''}${min}:${sec < 10 ? '0' : ''}${sec}`;
 
+    // Compute placement against finished players/bots
+    const fasterOpponents = players.filter(p => !p.socketId.includes('you') && p.userId !== user?.id && p.finished).length;
+    const finalPlace = Math.max(1, fasterOpponents + 1);
+
     let earnedCoins = 100 + Math.floor((stats.accuracy / 100) * 50);
     let earnedXp = 50;
-    if (stats.place === 1) earnedXp += 50;
-    else if (stats.place === 2) earnedXp += 30;
-    else if (stats.place === 3) earnedXp += 15;
+    if (finalPlace === 1) earnedXp += 50;
+    else if (finalPlace === 2) earnedXp += 30;
+    else if (finalPlace === 3) earnedXp += 15;
 
     let unlocked: any[] = [];
     try {
+      const matchMode = roomId?.startsWith('room_bot_')
+        ? 'bot'
+        : roomMeta?.isPrivate
+        ? 'private'
+        : 'quick';
+
       const res = await api.submitRaceResult({
         wpm: stats.wpm,
         accuracy: stats.accuracy,
         durationSec: stats.durationSec,
-        place: stats.place,
-        mode: roomMeta?.isPrivate ? 'private' : 'quick'
+        place: finalPlace,
+        mode: matchMode
       });
       if (res.rewards) {
         earnedCoins = res.rewards.coinsEarned;
@@ -366,7 +597,7 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
       accuracy: stats.accuracy,
       time: formattedTime,
       durationSec: stats.durationSec,
-      place: stats.place,
+      place: finalPlace,
       coinsEarned: earnedCoins,
       xpEarned: earnedXp,
       unlockedAchievements: unlocked
@@ -397,6 +628,8 @@ export const RaceProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
         joinPrivateRoom,
         toggleReady,
         startPrivateRace,
+        requestRematch,
+        startBotRace,
         leaveRoom,
         sendProgress,
         submitFinalRace,

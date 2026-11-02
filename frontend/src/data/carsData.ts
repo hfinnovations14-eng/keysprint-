@@ -109,6 +109,30 @@ export const CARS_DATA: CarItem[] = [
     topSpeedTier: 'S',
     accelerationTier: 'A',
     trailColor: '#F472B6'
+  },
+  {
+    id: 'retro',
+    name: 'Retro Classic',
+    category: 'Epic',
+    price: 2200,
+    owned: false,
+    equipped: false,
+    description: 'Vintage racing heritage engineered with timeless aerodynamic contours.',
+    topSpeedTier: 'S',
+    accelerationTier: 'A+',
+    trailColor: '#F59E0B'
+  },
+  {
+    id: 'jeep',
+    name: 'Jeep Pioneer',
+    category: 'Common',
+    price: 1600,
+    owned: false,
+    equipped: false,
+    description: 'All-terrain endurance cruiser built for rugged resilience across tough tracks.',
+    topSpeedTier: 'A',
+    accelerationTier: 'A',
+    trailColor: '#10B981'
   }
 ];
 

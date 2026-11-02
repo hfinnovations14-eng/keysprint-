@@ -1,13 +1,41 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../config/db.js';
+import { AuthRequest } from '../middlewares/authMiddleware.js';
 
-export const getLeaderboard = async (req: Request, res: Response) => {
+export const getLeaderboard = async (req: AuthRequest, res: Response) => {
   try {
-    const { country } = req.query;
+    const { country, filter } = req.query;
+
+    let targetUserIds: string[] | undefined = undefined;
+
+    if (filter === 'friends') {
+      const currentUserId = req.user?.userId;
+      if (!currentUserId) {
+        return res.status(401).json({ error: 'Authentication required to view friends leaderboard' });
+      }
+
+      const friendships = await prisma.friendship.findMany({
+        where: {
+          status: 'accepted',
+          OR: [{ requesterId: currentUserId }, { receiverId: currentUserId }]
+        }
+      });
+
+      const friendIds = friendships.map(f =>
+        f.requesterId === currentUserId ? f.receiverId : f.requesterId
+      );
+
+      // Friends leaderboard includes current user + accepted friends
+      targetUserIds = [currentUserId, ...friendIds];
+    }
 
     const userWhere: any = {
       status: 'active'
     };
+
+    if (targetUserIds) {
+      userWhere.id = { in: targetUserIds };
+    }
 
     if (country && typeof country === 'string' && country !== 'all') {
       userWhere.profile = { countryCode: country };
@@ -41,7 +69,8 @@ export const getLeaderboard = async (req: Request, res: Response) => {
       accuracy: stat.accuracy,
       races: stat.racesCount,
       wins: stat.winsCount,
-      level: stat.level
+      level: stat.level,
+      isYou: req.user?.userId === stat.userId
     }));
 
     return res.json({ leaderboard });

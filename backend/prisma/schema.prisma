@@ -28,6 +28,7 @@ model User {
   sentFriendships     Friendship[] @relation("FriendshipRequester")
   receivedFriendships Friendship[] @relation("FriendshipReceiver")
   notifications       UserNotification[]
+  tournamentEntries   TournamentParticipant[]
 
   @@map("users")
 }
@@ -182,4 +183,42 @@ model UserNotification {
   createdAt DateTime @default(now())
 
   @@map("user_notifications")
+}
+
+model Tournament {
+  id              String                  @id @default(uuid())
+  title           String
+  description     String
+  status          String                  @default("upcoming") // upcoming, active, completed
+  startTime       DateTime
+  endTime         DateTime
+  entryFeeCoins   Int                     @default(0)
+  minLevel        Int                     @default(1)
+  prizePoolCoins  Int                     @default(1000)
+  trackId         String                  @default("green-valley")
+  rules           String                  @default("Standard 1v1 Bracket, Best of 3")
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  participants    TournamentParticipant[]
+
+  @@map("tournaments")
+}
+
+model TournamentParticipant {
+  id              String      @id @default(uuid())
+  tournamentId    String
+  tournament      Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registeredAt    DateTime    @default(now())
+  bestWpm         Int         @default(0)
+  bestAccuracy    Float       @default(100.0)
+  bestTimeMs      Int         @default(0)
+  racesPlayed     Int         @default(0)
+  points          Int         @default(0)
+  finalRank       Int?
+
+  @@unique([tournamentId, userId])
+  @@map("tournament_participants")
 }

@@ -11,11 +11,12 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (body: { email: string; password: string; nickname: string; countryCode?: string }) => Promise<void>;
   guestLogin: (nickname?: string) => Promise<void>;
+  ensureGuestSession: (nickname?: string) => Promise<CurrentUser>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateCoins: (coins: number) => void;
   equipCar: (carId: string) => Promise<void>;
-  purchaseCar: (carId: string, cost: number) => Promise<{ success: boolean; error?: string }>;
+  purchaseCar: (carId: string, cost?: number, itemType?: string) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (data: { nickname?: string; avatarId?: string; countryCode?: string; bio?: string }) => Promise<void>;
 }
 
@@ -77,6 +78,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     }
   };
 
+  const ensureGuestSession = async (nickname?: string): Promise<CurrentUser> => {
+    if (user) return user;
+    const storedToken = getAuthToken();
+    if (storedToken) {
+      try {
+        const res = await api.getMe();
+        if (res.user) {
+          setUser(res.user);
+          return res.user;
+        }
+      } catch {
+        clearAuthToken();
+        setTokenState(null);
+      }
+    }
+
+    const res = await api.guestLogin(nickname);
+    if (res.token && res.user) {
+      setAuthToken(res.token);
+      setTokenState(res.token);
+      setUser(res.user);
+      return res.user;
+    }
+    throw new Error('Failed to create guest session');
+  };
+
   const logout = () => {
     clearAuthToken();
     setTokenState(null);
@@ -107,43 +134,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
     });
   };
 
-  const equipCar = async (carId: string) => {
-    await api.equipItem(carId, 'car');
-    setUser(prev => {
-      if (!prev) return null;
-      const updatedInventory = prev.inventory.map(item => {
-        if (item.itemType === 'car') {
-          return { ...item, isEquipped: item.itemId === carId };
-        }
-        return item;
-      });
-      return {
-        ...prev,
-        inventory: updatedInventory
-      };
-    });
+  const equipCar = async (carId: string): Promise<void> => {
+    try {
+      await api.equipItem(carId, 'car');
+      await refreshUser();
+    } catch (err: any) {
+      console.error('Failed to equip car:', err);
+      throw err;
+    }
   };
 
-  const purchaseCar = async (carId: string, cost: number): Promise<{ success: boolean; error?: string }> => {
+  const purchaseCar = async (carId: string, cost?: number, itemType: string = 'car'): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await api.purchaseStoreItem(carId, cost, 'car');
-      if (res.item) {
-        setUser(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            stats: {
-              ...prev.stats,
-              coins: res.coins
-            },
-            inventory: [...prev.inventory, res.item]
-          };
-        });
+      const res = await api.purchaseStoreItem(carId, cost, itemType);
+      if (res.item || res.coins !== undefined) {
+        if (typeof res.coins === 'number') {
+          updateCoins(res.coins);
+        }
+        await refreshUser();
         return { success: true };
       }
-      return { success: false, error: 'Failed to process purchase' };
+      throw new Error('Purchase could not be verified by server');
     } catch (err: any) {
-      return { success: false, error: err.message || 'Purchase error' };
+      const msg = err.message || 'Purchase error';
+      console.error('Purchase error:', msg);
+      throw new Error(msg);
     }
   };
 
@@ -173,6 +188,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }: { 
         login,
         register,
         guestLogin,
+        ensureGuestSession,
         logout,
         refreshUser,
         updateCoins,

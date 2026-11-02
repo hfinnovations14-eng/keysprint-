@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Warehouse, Check, Sparkles, SlidersHorizontal, Palette, Flame, Shield, Coins } from 'lucide-react';
+import { Warehouse, Check, Sparkles, SlidersHorizontal, Palette, Flame, Shield, Coins, Loader2, AlertCircle } from 'lucide-react';
 import { SvgCar, CarModelId } from '../../components/common/SvgCar';
 import { CARS_DATA, CarItem } from '../../data/carsData';
 import { useAuth } from '../../context/AuthContext';
@@ -19,6 +19,8 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
 }: Screen24GarageProps) => {
   const { user, equipCar, purchaseCar } = useAuth();
   const [activeCategory, setActiveCategory] = useState<'All' | 'Common' | 'Rare' | 'Epic' | 'Legendary'>('All');
+  const [isEquipping, setIsEquipping] = useState<boolean>(false);
+  const [equipError, setEquipError] = useState<string | null>(null);
   
   const userEquipped = (user?.inventory?.find(i => i.isEquipped)?.itemId as CarModelId) || equippedCarId;
   const [currentEquipped, setCurrentEquipped] = useState<CarModelId>(userEquipped);
@@ -46,10 +48,18 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
     : CARS_DATA.filter(c => c.category === activeCategory);
 
   const handleEquip = async (car: CarItem) => {
-    setCurrentEquipped(car.id);
-    setSelectedPreview(car);
-    if (onEquipCar) onEquipCar(car.id);
-    await equipCar(car.id);
+    if (isEquipping || currentEquipped === car.id) return;
+    setIsEquipping(true);
+    setEquipError(null);
+    try {
+      await equipCar(car.id);
+      setCurrentEquipped(car.id);
+      setSelectedPreview(car);
+    } catch (err: any) {
+      setEquipError(err.message || 'Failed to equip vehicle');
+    } finally {
+      setIsEquipping(false);
+    }
   };
 
   const handleConfirmPurchase = async (cost: number) => {
@@ -58,7 +68,7 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
     setSelectedItemForPurchase(null);
   };
 
-  const userCoins = user?.stats?.coins ?? 2450;
+  const userCoins = user?.stats?.coins ?? 0;
 
   return (
     <div className="screen-page garage-screen">
@@ -125,6 +135,13 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
               </div>
             </div>
 
+            {equipError && (
+              <div className="card-cream mt-3 flex-center gap-2 text-red p-2 rounded">
+                <AlertCircle size={16} />
+                <span className="text-xs">{equipError}</span>
+              </div>
+            )}
+
             <div className="inspector-actions-row mt-4">
               {currentEquipped === selectedPreview.id ? (
                 <button className="btn btn-secondary" disabled>
@@ -135,14 +152,25 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                 <button 
                   className="btn btn-primary btn-lg"
                   onClick={() => handleEquip(selectedPreview)}
+                  disabled={isEquipping}
                 >
-                  <Check size={18} />
-                  <span>Equip This Car</span>
+                  {isEquipping ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Equipping Vehicle...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={18} />
+                      <span>Equip This Car</span>
+                    </>
+                  )}
                 </button>
               ) : (
                 <button 
                   className="btn btn-gold btn-lg"
                   onClick={() => setSelectedItemForPurchase(selectedPreview)}
+                  disabled={isEquipping}
                 >
                   <Coins size={18} />
                   <span>Unlock in Shop (🪙 {selectedPreview.price})</span>
@@ -192,16 +220,18 @@ export const Screen24Garage: React.FC<Screen24GarageProps> = ({
                     ) : owned ? (
                       <button 
                         className="btn btn-primary btn-sm full-width"
+                        disabled={isEquipping}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleEquip(car);
                         }}
                       >
-                        Equip
+                        {isEquipping && selectedPreview.id === car.id ? 'Equipping...' : 'Equip'}
                       </button>
                     ) : (
                       <button 
                         className="btn btn-outline btn-sm full-width"
+                        disabled={isEquipping}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedItemForPurchase(car);

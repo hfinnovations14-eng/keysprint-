@@ -11,22 +11,16 @@ interface Screen12PreRaceLobbyProps {
 
 export const Screen12PreRaceLobby: React.FC<Screen12PreRaceLobbyProps> = ({ onNavigate }: Screen12PreRaceLobbyProps) => {
   const { user } = useAuth();
-  const { players, roomId } = useRace();
-  const [countdown, setCountdown] = useState(3);
+  const { players, roomId, countdown, roomStatus } = useRace();
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setTimeout(() => onNavigate('screen-13'), 800);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [onNavigate]);
+    if (roomStatus === 'racing' || countdown === 0) {
+      const t = setTimeout(() => {
+        onNavigate('screen-13');
+      }, 400);
+      return () => clearTimeout(t);
+    }
+  }, [roomStatus, countdown, onNavigate]);
 
   const displayPlayers = players.length > 0 ? players : [
     { socketId: '1', userId: user?.id || 'you', nickname: user?.profile?.nickname || 'AlexPro', carId: 'blaze', avatar: '🏎️', progress: 0, wpm: 0, accuracy: 100, finished: false },

@@ -21,13 +21,12 @@ export const Screen11MatchmakingQueue: React.FC<Screen11MatchmakingQueueProps> =
   }, []);
 
   useEffect(() => {
-    if (roomStatus === 'countdown' && countdown <= 1) {
-      const t = setTimeout(() => {
-        onNavigate('screen-12');
-      }, 500);
-      return () => clearTimeout(t);
+    if (roomStatus === 'countdown') {
+      onNavigate('screen-12');
+    } else if (roomStatus === 'racing') {
+      onNavigate('screen-13');
     }
-  }, [roomStatus, countdown, onNavigate]);
+  }, [roomStatus, onNavigate]);
 
   const handleCancel = () => {
     leaveMatchmaking();

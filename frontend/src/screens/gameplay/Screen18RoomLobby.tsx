@@ -107,7 +107,9 @@ export const Screen18RoomLobby: React.FC<Screen18RoomLobbyProps> = ({ onNavigate
                   <span>{selectedTrackData.name}</span>
                 </span>
                 {roomMeta?.fillWithBots && (
-                  <span className="badge badge-green">AI Fill Enabled</span>
+                  <span className="badge badge-green">
+                    AI Fill: {roomMeta.botDifficulty ? roomMeta.botDifficulty.toUpperCase() : 'NORMAL'}
+                  </span>
                 )}
               </div>
               <h2>{activeRoomName}</h2>

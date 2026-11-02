@@ -18,8 +18,9 @@ export const Screen29Leaderboard: React.FC<Screen29LeaderboardProps> = ({ onNavi
       setLoading(true);
       try {
         const countryParam = activeTab === 'Country' ? 'US' : undefined;
-        const res = await api.getLeaderboard(countryParam);
-        if (res.leaderboard && res.leaderboard.length > 0) {
+        const filterParam = activeTab === 'Friends' ? 'friends' : undefined;
+        const res = await api.getLeaderboard(countryParam, filterParam);
+        if (res.leaderboard) {
           setDbLeaderboard(res.leaderboard);
         }
       } catch (e) {

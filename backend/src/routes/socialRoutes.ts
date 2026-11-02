@@ -4,6 +4,9 @@ import {
   searchUsers,
   sendFriendRequest,
   acceptFriendRequest,
+  rejectFriendRequest,
+  blockUser,
+  unblockUser,
   removeFriendship,
   getNotifications,
   markNotificationRead,
@@ -17,6 +20,9 @@ router.get('/friends', authenticateToken, getFriends);
 router.get('/users/search', authenticateToken, searchUsers);
 router.post('/friends/request', authenticateToken, sendFriendRequest);
 router.put('/friends/accept', authenticateToken, acceptFriendRequest);
+router.put('/friends/reject', authenticateToken, rejectFriendRequest);
+router.post('/friends/block', authenticateToken, blockUser);
+router.post('/friends/unblock', authenticateToken, unblockUser);
 router.delete('/friends/:id', authenticateToken, removeFriendship);
 router.get('/notifications', authenticateToken, getNotifications);
 router.put('/notifications/:id/read', authenticateToken, markNotificationRead);

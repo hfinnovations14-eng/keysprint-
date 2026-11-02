@@ -5,6 +5,7 @@ import userRoutes from './userRoutes.js';
 import leaderboardRoutes from './leaderboardRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import socialRoutes from './socialRoutes.js';
+import tournamentRoutes from './tournamentRoutes.js';
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.use('/user', userRoutes);
 router.use('/leaderboard', leaderboardRoutes);
 router.use('/admin', adminRoutes);
 router.use('/social', socialRoutes);
+router.use('/tournaments', tournamentRoutes);
 
 router.get('/health', (req, res) => {
   res.json({

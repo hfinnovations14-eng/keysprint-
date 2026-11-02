@@ -16,10 +16,20 @@ export const Screen17CreateRoom: React.FC<Screen17CreateRoomProps> = ({ onNaviga
   const [roomName, setRoomName] = useState(
     user?.profile?.nickname ? `${user.profile.nickname}'s Grand Prix` : "Alex's Fast Lane"
   );
-  const [roomCode, setRoomCode] = useState(() => `SPRINT-${Math.floor(10 + Math.random() * 90)}`);
+  const [roomCode, setRoomCode] = useState(() => {
+    const prefixes = ['SPRINT', 'APEX', 'TURBO', 'NITRO', 'DRIFT', 'HYPER'];
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    let suffix = '';
+    for (let i = 0; i < 4; i++) {
+      suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return `${prefix}-${suffix}`;
+  });
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [selectedTrack, setSelectedTrack] = useState('green-valley');
   const [fillWithBots, setFillWithBots] = useState(true);
+  const [botDifficulty, setBotDifficulty] = useState<'easy' | 'normal' | 'advanced'>('normal');
   const [isPrivate, setIsPrivate] = useState(true);
 
   // Join Tab State
@@ -28,10 +38,14 @@ export const Screen17CreateRoom: React.FC<Screen17CreateRoomProps> = ({ onNaviga
   const [copiedCode, setCopiedCode] = useState(false);
 
   const generateNewCode = () => {
-    const prefixes = ['SPRINT', 'APEX', 'TURBO', 'NITRO', 'DRIFT'];
+    const prefixes = ['SPRINT', 'APEX', 'TURBO', 'NITRO', 'DRIFT', 'HYPER'];
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const num = Math.floor(10 + Math.random() * 90);
-    setRoomCode(`${prefix}-${num}`);
+    let suffix = '';
+    for (let i = 0; i < 4; i++) {
+      suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    setRoomCode(`${prefix}-${suffix}`);
   };
 
   const handleCopyCode = () => {
@@ -53,7 +67,8 @@ export const Screen17CreateRoom: React.FC<Screen17CreateRoomProps> = ({ onNaviga
       roomCode: roomCode.trim().toUpperCase(),
       maxPlayers,
       trackId: selectedTrack,
-      fillWithBots
+      fillWithBots,
+      botDifficulty
     });
 
     onNavigate('screen-18'); // Enter Lobby
@@ -213,6 +228,24 @@ export const Screen17CreateRoom: React.FC<Screen17CreateRoomProps> = ({ onNaviga
                     <p className="text-xs text-secondary">Automatically populate empty grid slots when host starts the match.</p>
                   </div>
                 </label>
+
+                {fillWithBots && (
+                  <div className="room-bot-difficulty-selector mt-2 pl-4 py-2" style={{ borderLeft: '2px solid var(--color-orange, #f97316)' }}>
+                    <label className="text-xs font-semibold text-secondary block mb-1">AI Bot Difficulty</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {(['easy', 'normal', 'advanced'] as const).map(diff => (
+                        <button
+                          key={diff}
+                          type="button"
+                          className={`btn btn-xs ${botDifficulty === diff ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => setBotDifficulty(diff)}
+                        >
+                          {diff === 'easy' ? '🟢 Easy (~50 WPM)' : diff === 'normal' ? '🟡 Normal (~95 WPM)' : '🔴 Advanced (~150 WPM)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <label className="toggle-row mt-2">
                   <input 

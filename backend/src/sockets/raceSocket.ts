@@ -1,4 +1,5 @@
 import { Server, Socket } from 'socket.io';
+import { randomBytes } from 'node:crypto';
 import { prisma } from '../config/db.js';
 
 export interface Player {
@@ -26,6 +27,7 @@ export interface Room {
   maxPlayers: number;
   trackId: string;
   fillWithBots: boolean;
+  botDifficulty?: 'easy' | 'normal' | 'advanced';
   passageText: string;
   status: 'waiting' | 'countdown' | 'racing' | 'finished';
   players: Map<string, Player>;
@@ -37,27 +39,59 @@ export interface Room {
 
 const rooms = new Map<string, Room>();
 let ioInstance: Server | null = null;
-export const onlineUsers = new Map<string, string>(); // userId -> socketId
+export const onlineUsers = new Map<string, Set<string>>(); // userId -> Set of socketIds
 
 export const isUserOnline = (userId: string): boolean => {
-  return onlineUsers.has(userId);
+  const sockets = onlineUsers.get(userId);
+  return !!(sockets && sockets.size > 0);
 };
 
 export const sendSocketNotification = (userId: string, event: string, payload: any): boolean => {
-  const socketId = onlineUsers.get(userId);
-  if (socketId && ioInstance) {
-    ioInstance.to(socketId).emit(event, payload);
+  const sockets = onlineUsers.get(userId);
+  if (sockets && sockets.size > 0 && ioInstance) {
+    for (const socketId of sockets) {
+      ioInstance.to(socketId).emit(event, payload);
+    }
     return true;
   }
   return false;
 };
 
-const BOT_PROFILES = [
-  { name: 'Turbo Bot [AI]', carId: 'thunder', avatar: '🤖', baseWpm: 85 },
-  { name: 'Apex AI [AI]', carId: 'golden', avatar: '⚡', baseWpm: 110 },
-  { name: 'Drift Bot [AI]', carId: 'forest', avatar: '🏎️', baseWpm: 95 },
-  { name: 'Nitro Nova [AI]', carId: 'retro', avatar: '🚀', baseWpm: 102 }
-];
+const SECURE_PREFIXES = ['SPRINT', 'APEX', 'TURBO', 'NITRO', 'DRIFT', 'HYPER'];
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+export const generateSecureRoomCode = (): string => {
+  const prefix = SECURE_PREFIXES[Math.floor(Math.random() * SECURE_PREFIXES.length)];
+  const bytes = randomBytes(4);
+  let suffix = '';
+  for (let i = 0; i < 4; i++) {
+    suffix += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  }
+  return `${prefix}-${suffix}`;
+};
+
+export const BOT_PROFILES_BY_DIFFICULTY = {
+  easy: [
+    { name: 'Turbo Bot [AI]', carId: 'jeep', avatar: '🤖', baseWpm: 48 },
+    { name: 'Rookie Drift [AI]', carId: 'starter', avatar: '🏎️', baseWpm: 52 },
+    { name: 'Cadence Cruiser [AI]', carId: 'forest', avatar: '⚡', baseWpm: 55 },
+    { name: 'Pace Car [AI]', carId: 'retro', avatar: '🚗', baseWpm: 50 }
+  ],
+  normal: [
+    { name: 'Turbo Bot [AI]', carId: 'thunder', avatar: '🤖', baseWpm: 92 },
+    { name: 'Apex AI [AI]', carId: 'golden', avatar: '⚡', baseWpm: 104 },
+    { name: 'Drift Bot [AI]', carId: 'forest', avatar: '🏎️', baseWpm: 98 },
+    { name: 'Nitro Nova [AI]', carId: 'retro', avatar: '🚀', baseWpm: 100 }
+  ],
+  advanced: [
+    { name: 'Nitro Nova [AI]', carId: 'shadow', avatar: '🚀', baseWpm: 145 },
+    { name: 'SpeedMaster AI [AI]', carId: 'golden', avatar: '👑', baseWpm: 152 },
+    { name: 'Apex Predator [AI]', carId: 'neon', avatar: '⚡', baseWpm: 160 },
+    { name: 'Hyper Velocity [AI]', carId: 'rose', avatar: '🔥', baseWpm: 148 }
+  ]
+};
+
+const BOT_PROFILES = BOT_PROFILES_BY_DIFFICULTY.normal;
 
 export const getRoomByCode = (code: string) => {
   const clean = code.trim().toUpperCase();
@@ -69,6 +103,7 @@ export const getRoomByCode = (code: string) => {
         name: room.name,
         status: room.status,
         trackId: room.trackId,
+        botDifficulty: room.botDifficulty || 'normal',
         playersCount: room.players.size,
         maxPlayers: room.maxPlayers
       };
@@ -86,6 +121,7 @@ const getRoomPayload = (room: Room) => ({
   maxPlayers: room.maxPlayers,
   trackId: room.trackId,
   fillWithBots: room.fillWithBots,
+  botDifficulty: room.botDifficulty || 'normal',
   status: room.status,
   passageText: room.passageText,
   players: Array.from(room.players.values())
@@ -110,11 +146,13 @@ export const initRaceSocket = (io: Server) => {
         return;
       }
 
+      const totalWords = Math.max(8, (room.passageText || '').trim().split(/\s+/).length);
       let allFinished = true;
       for (const player of room.players.values()) {
         if (player.isBot && !player.finished) {
-          const step = (player.wpm / 60) * 0.45;
-          player.progress = Math.min(100, player.progress + step);
+          const wordsPerSec = (player.wpm / 60) * (0.95 + Math.random() * 0.1);
+          const step = (wordsPerSec / totalWords) * 100;
+          player.progress = Math.min(100, Math.round((player.progress + step) * 10) / 10);
           if (player.progress >= 100) {
             player.finished = true;
             player.finishTime = Date.now() - (room.startTime || Date.now());
@@ -199,7 +237,14 @@ export const initRaceSocket = (io: Server) => {
   io.on('connection', (socket: Socket) => {
 
     socket.on('user.register', ({ userId }: { userId: string }) => {
-      if (userId) onlineUsers.set(userId, socket.id);
+      if (userId) {
+        let userSockets = onlineUsers.get(userId);
+        if (!userSockets) {
+          userSockets = new Set<string>();
+          onlineUsers.set(userId, userSockets);
+        }
+        userSockets.add(socket.id);
+      }
     });
 
     // 1. PUBLIC MATCHMAKING JOIN
@@ -313,24 +358,45 @@ export const initRaceSocket = (io: Server) => {
       roomCode,
       maxPlayers = 4,
       trackId = 'green-valley',
-      fillWithBots = true
+      fillWithBots = true,
+      botDifficulty = 'normal'
     }: {
       userId: string;
       nickname: string;
       carId: string;
       avatar?: string;
       roomName?: string;
-      roomCode: string;
+      roomCode?: string;
       maxPlayers?: number;
       trackId?: string;
       fillWithBots?: boolean;
+      botDifficulty?: 'easy' | 'normal' | 'advanced';
     }) => {
-      const cleanCode = (roomCode || `SPRINT-${Math.floor(10 + Math.random() * 90)}`).trim().toUpperCase();
+      let cleanCode = (roomCode || '').trim().toUpperCase();
+
+      // Check if provided code belongs to an existing room of another host
+      if (cleanCode) {
+        const existingByCode = Array.from(rooms.values()).find(
+          r => r.code?.toUpperCase() === cleanCode.toUpperCase()
+        );
+        if (existingByCode && existingByCode.hostSocketId !== socket.id) {
+          socket.emit('room.error', { message: `Room code "${cleanCode}" is already in use by another active lobby.` });
+          return;
+        }
+      } else {
+        // Auto-generate high-entropy code ensuring zero collision
+        let attempts = 0;
+        do {
+          cleanCode = generateSecureRoomCode();
+          attempts++;
+        } while (Array.from(rooms.values()).some(r => r.code?.toUpperCase() === cleanCode.toUpperCase()) && attempts < 25);
+      }
+
       const roomId = `room_priv_${cleanCode}`;
 
-      // Clean up previous room with same id if any
+      // Clean up previous room hosted by this same socket if any
       const existing = rooms.get(roomId);
-      if (existing) {
+      if (existing && existing.hostSocketId === socket.id) {
         if (existing.botFillTimeout) clearTimeout(existing.botFillTimeout);
         if (existing.botInterval) clearInterval(existing.botInterval);
         rooms.delete(roomId);
@@ -348,6 +414,9 @@ export const initRaceSocket = (io: Server) => {
         console.error('Error fetching passage for private room:', err);
       }
 
+      const validDifficulty: 'easy' | 'normal' | 'advanced' = 
+        (botDifficulty === 'easy' || botDifficulty === 'advanced') ? botDifficulty : 'normal';
+
       const room: Room = {
         id: roomId,
         code: cleanCode,
@@ -355,8 +424,9 @@ export const initRaceSocket = (io: Server) => {
         isPrivate: true,
         hostSocketId: socket.id,
         maxPlayers: Math.max(2, Math.min(6, maxPlayers)),
-        trackId,
+        trackId: trackId || 'green-valley',
         fillWithBots,
+        botDifficulty: validDifficulty,
         passageText,
         status: 'waiting',
         players: new Map(),
@@ -470,8 +540,10 @@ export const initRaceSocket = (io: Server) => {
       // If fillWithBots is enabled, fill open spots with AI bots
       if (room.fillWithBots && room.players.size < room.maxPlayers) {
         const neededBots = room.maxPlayers - room.players.size;
+        const diff = room.botDifficulty || 'normal';
+        const botPool = BOT_PROFILES_BY_DIFFICULTY[diff] || BOT_PROFILES_BY_DIFFICULTY.normal;
         for (let i = 0; i < neededBots; i++) {
-          const bot = BOT_PROFILES[i % BOT_PROFILES.length];
+          const bot = botPool[i % botPool.length];
           const botId = `bot_${bot.name.replace(/\s+/g, '_')}_${i}`;
           room.players.set(botId, {
             socketId: botId,
@@ -490,6 +562,56 @@ export const initRaceSocket = (io: Server) => {
       }
 
       executeCountdownAndStart(room);
+    });
+
+    // 5b. ROOM REMATCH (Lobby reset for rematch)
+    socket.on('room.rematch', async ({ roomId }: { roomId: string }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+
+      if (!room.players.has(socket.id)) return;
+
+      if (room.botInterval) {
+        clearInterval(room.botInterval);
+        room.botInterval = undefined;
+      }
+      if (room.botFillTimeout) {
+        clearTimeout(room.botFillTimeout);
+        room.botFillTimeout = undefined;
+      }
+
+      // Remove bot players so room returns to human participants
+      for (const [id, player] of Array.from(room.players.entries())) {
+        if (player.isBot) {
+          room.players.delete(id);
+        } else {
+          player.progress = 0;
+          player.wpm = 0;
+          player.accuracy = 100;
+          player.finished = false;
+          player.finishTime = undefined;
+          player.isReady = player.isHost;
+        }
+      }
+
+      // Fetch a fresh passage for rematch
+      try {
+        const count = await prisma.passage.count({ where: { status: 'active' } });
+        if (count > 0) {
+          const skip = Math.floor(Math.random() * count);
+          const randomPassage = await prisma.passage.findFirst({ where: { status: 'active' }, skip });
+          if (randomPassage) room.passageText = randomPassage.text;
+        }
+      } catch (err) {
+        console.error('Error fetching new passage for rematch:', err);
+      }
+
+      room.status = 'waiting';
+      room.startTime = undefined;
+      room.countdownSeconds = 3;
+
+      io.to(roomId).emit('room.rematch_ready', { room: getRoomPayload(room) });
+      sendRoomUpdate(room);
     });
 
     // 6. LEAVE ROOM
@@ -525,6 +647,16 @@ export const initRaceSocket = (io: Server) => {
           accuracy: player.accuracy,
           place: finishedCount
         });
+
+        const allFinished = Array.from(room.players.values()).every(p => p.finished);
+        if (allFinished) {
+          room.status = 'finished';
+          if (room.botInterval) {
+            clearInterval(room.botInterval);
+            room.botInterval = undefined;
+          }
+          sendRoomUpdate(room);
+        }
       }
 
       io.to(roomId).emit('players.progress', {
@@ -534,9 +666,12 @@ export const initRaceSocket = (io: Server) => {
 
     // 8. DISCONNECT
     socket.on('disconnect', () => {
-      for (const [uId, sId] of onlineUsers.entries()) {
-        if (sId === socket.id) {
-          onlineUsers.delete(uId);
+      for (const [uId, sIds] of onlineUsers.entries()) {
+        if (sIds.has(socket.id)) {
+          sIds.delete(socket.id);
+          if (sIds.size === 0) {
+            onlineUsers.delete(uId);
+          }
           break;
         }
       }

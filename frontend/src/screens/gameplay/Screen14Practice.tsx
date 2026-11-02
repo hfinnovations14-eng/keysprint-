@@ -8,6 +8,7 @@ import {
   setLastPracticeSession,
   getTopWeakKeys 
 } from '../../services/telemetryService';
+import { computeTypingState } from '../../services/typingEngine';
 
 interface Screen14PracticeProps {
   onNavigate: (screenId: string) => void;
@@ -25,12 +26,11 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
 
   // Typing session state
   const [typed, setTyped] = useState('');
-  const [wpm, setWpm] = useState(0);
-  const [accuracy, setAccuracy] = useState(100);
-  const [errors, setErrors] = useState(0);
   const [errorKeys, setErrorKeys] = useState<string[]>([]);
   const [totalKeystrokes, setTotalKeystrokes] = useState(0);
   const [correctKeystrokes, setCorrectKeystrokes] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isFocused, setIsFocused] = useState(true);
 
   // Timed mode state
   const [durationSec, setDurationSec] = useState<number>(initialConfig.durationSec || 60);
@@ -41,13 +41,18 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
   const inputRef = useRef<HTMLInputElement>(null);
   const startTimeRef = useRef<number>(Date.now());
 
+  // Focus input on mount & load initial drill
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
   const loadDrill = async (type: 'normal' | 'keys' | 'numbers' | 'custom' | 'timed') => {
     setDrillType(type);
     setTyped('');
-    setErrors(0);
     setErrorKeys([]);
     setTotalKeystrokes(0);
     setCorrectKeystrokes(0);
+    setElapsedSeconds(0);
     setHasStarted(false);
     setIsFinished(false);
 
@@ -87,8 +92,32 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
   }, []);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    focusInput();
   }, [drillType, passage]);
+
+  // Global keydown capture: automatically focus input on keypress
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Tab' || e.key === 'Escape') return;
+
+      if (!isEditingCustom && document.activeElement !== inputRef.current && (e.key.length === 1 || e.key === 'Backspace')) {
+        focusInput();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isEditingCustom]);
+
+  // Elapsed time ticker
+  useEffect(() => {
+    if (!hasStarted || isFinished) return;
+    const ticker = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(ticker);
+  }, [hasStarted, isFinished]);
 
   // Timed countdown ticker
   useEffect(() => {
@@ -108,15 +137,27 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
     return () => clearInterval(timer);
   }, [drillType, hasStarted, isFinished]);
 
+  // Compute live typing state
+  const typingState = computeTypingState(
+    passage,
+    typed,
+    totalKeystrokes,
+    correctKeystrokes,
+    elapsedSeconds
+  );
+
   const finishSession = () => {
+    if (isFinished) return;
     setIsFinished(true);
-    const finalWpm = Math.max(1, wpm);
-    const finalAcc = Math.max(50, Math.min(100, accuracy));
+
+    const finalWpm = Math.max(1, typingState.wpm);
+    const finalAcc = Math.max(50, typingState.accuracy);
+    const errorsCount = Math.max(0, totalKeystrokes - correctKeystrokes);
 
     setLastPracticeSession({
       speed: finalWpm,
       accuracy: finalAcc,
-      errors,
+      errors: errorsCount,
       mode: drillType,
       drillTitle,
       errorKeys
@@ -136,103 +177,109 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
       startTimeRef.current = Date.now();
     }
 
-    setTotalKeystrokes(prev => prev + 1);
-    const targetSlice = passage.slice(0, val.length);
+    let newTotal = totalKeystrokes;
+    let newCorrect = correctKeystrokes;
 
-    if (val === targetSlice) {
-      setTyped(val);
-      const newCorrect = correctKeystrokes + 1;
-      setCorrectKeystrokes(newCorrect);
+    if (val.length > typed.length) {
+      const charIndex = val.length - 1;
+      const typedChar = val[charIndex];
+      const expectedChar = passage[charIndex] || '';
+      const isMatch = typedChar === expectedChar;
 
-      // Log accurate keystroke in telemetry
-      if (val.length > 0) {
-        const lastChar = val[val.length - 1];
-        recordKeystroke(lastChar, false);
-      }
+      newTotal += 1;
+      setTotalKeystrokes(newTotal);
 
-      // Compute Live WPM
-      const elapsedMin = Math.max(0.02, (Date.now() - startTimeRef.current) / 60000);
-      const curWpm = Math.round((val.length / 5) / elapsedMin);
-      setWpm(curWpm);
-
-      // Compute Accuracy
-      const currentAcc = Math.round((newCorrect / (totalKeystrokes + 1)) * 100);
-      setAccuracy(Math.min(100, Math.max(50, currentAcc)));
-
-      // If reached end of passage
-      if (val.length >= passage.length) {
-        finishSession();
-      }
-    } else {
-      // Keystroke error!
-      setErrors(prev => prev + 1);
-      const expectedChar = passage[typed.length] || '';
-      if (expectedChar) {
+      if (isMatch) {
+        newCorrect += 1;
+        setCorrectKeystrokes(newCorrect);
+        recordKeystroke(expectedChar, false);
+      } else {
         recordKeystroke(expectedChar, true);
-        if (!errorKeys.includes(expectedChar.toUpperCase())) {
+        if (expectedChar && !errorKeys.includes(expectedChar.toUpperCase())) {
           setErrorKeys(prev => [...prev, expectedChar.toUpperCase()]);
         }
       }
+    }
 
-      // Compute Accuracy on error
-      const currentAcc = Math.round((correctKeystrokes / (totalKeystrokes + 1)) * 100);
-      setAccuracy(Math.min(100, Math.max(50, currentAcc)));
+    setTyped(val);
+
+    const nextState = computeTypingState(
+      passage,
+      val,
+      newTotal,
+      newCorrect,
+      elapsedSeconds
+    );
+
+    if (nextState.isComplete) {
+      finishSession();
     }
   };
 
   const handleApplyCustom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customInputText.trim()) return;
+
     setPassage(customInputText.trim());
-    setDrillTitle('Custom User Passage');
+    setDrillTitle('Custom Practice Passage');
     setIsEditingCustom(false);
     setTyped('');
-    setErrors(0);
+    setTotalKeystrokes(0);
+    setCorrectKeystrokes(0);
+    setElapsedSeconds(0);
     setHasStarted(false);
+    setIsFinished(false);
   };
 
   const resetDrill = () => {
     setTyped('');
-    setErrors(0);
-    setErrorKeys([]);
     setTotalKeystrokes(0);
     setCorrectKeystrokes(0);
+    setElapsedSeconds(0);
     setHasStarted(false);
     setIsFinished(false);
     setTimeLeft(durationSec);
-    inputRef.current?.focus();
+    focusInput();
   };
 
+  const totalErrors = Math.max(0, totalKeystrokes - correctKeystrokes);
+
   return (
-    <div className="screen-page practice-screen" onClick={() => inputRef.current?.focus()}>
+    <div className="screen-page practice-screen" onClick={focusInput}>
       <div className="content-wrapper">
         <div className="practice-master-card card">
           {/* Header */}
-          <div className="practice-header-row flex-between">
-            <div>
-              <span className="badge badge-orange">Training Academy</span>
-              <h2 className="mt-1">{drillTitle}</h2>
-              <p className="text-secondary text-sm">Targeted finger coordination, touch cadence, and muscle memory training.</p>
-            </div>
+          <div className="flex-between mb-3">
             <button 
-              type="button"
-              className="btn btn-secondary btn-sm flex-center gap-1"
+              type="button" 
+              className="btn btn-outline btn-sm flex-center gap-1"
               onClick={() => onNavigate('screen-33')}
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft size={14} />
               <span>All Modes</span>
             </button>
+            <div className="flex-center gap-2">
+              <span className="badge badge-orange">Solo Academy</span>
+              <span className="badge badge-secondary">{drillTitle}</span>
+            </div>
           </div>
 
-          {/* 4 Drill Selector Cards */}
-          <div className="practice-types-grid mt-4">
+          <div className="practice-header-text text-center mb-4">
+            <h1 className="page-title">{drillTitle}</h1>
+            <p className="page-subtitle">
+              Zero pressure, no ranking points at risk. Focus entirely on rhythm and mechanical muscle memory.
+            </p>
+          </div>
+
+          {/* Drill Category Tabs */}
+          <div className="practice-type-selector-grid">
             <div 
               className={`practice-type-card card card-interactive ${drillType === 'normal' ? 'selected' : ''}`}
               onClick={() => loadDrill('normal')}
             >
-              <div className="p-type-icon">⌨️</div>
-              <h4 className="font-bold">Normal Practice</h4>
-              <p className="text-xs text-secondary">Random standard English sentences</p>
+              <div className="p-type-icon">📖</div>
+              <h4 className="font-bold">Standard Text</h4>
+              <p className="text-xs text-secondary">Balanced prose & stories</p>
             </div>
 
             <div 
@@ -286,15 +333,30 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
             </form>
           ) : (
             /* Typing Practice Box */
-            <div className="practice-typing-arena card-cream mt-4">
+            <div className="practice-typing-arena card-cream mt-4" onClick={focusInput}>
               <div className="practice-stats-strip flex-between">
                 <div className="flex-center gap-3">
-                  <span className="stat-pill"><Zap size={14} className="text-orange" /> <strong>{wpm}</strong> WPM</span>
-                  <span className="stat-pill"><CheckCircle2 size={14} className="text-green" /> <strong>{accuracy}%</strong> Acc</span>
-                  <span className="stat-pill text-red"><strong>{errors}</strong> Typos</span>
+                  <span className="stat-pill">
+                    <Zap size={14} className="text-orange" />
+                    <strong>{typingState.wpm}</strong> WPM
+                  </span>
+                  <span className="stat-pill">
+                    <CheckCircle2 size={14} className="text-green" />
+                    <strong>{typingState.accuracy}%</strong> Acc
+                  </span>
+                  <span className="stat-pill text-red">
+                    <strong>{totalErrors}</strong> Typos
+                  </span>
                 </div>
 
                 <div className="flex-center gap-3">
+                  {typingState.hasError && (
+                    <div className="typo-warning-pill animate-pulse">
+                      <AlertTriangle size={13} />
+                      <span>Backspace to fix typo</span>
+                    </div>
+                  )}
+
                   {drillType === 'timed' && (
                     <span className="badge badge-gold font-bold flex-center gap-1">
                       <Clock size={12} />
@@ -302,25 +364,76 @@ export const Screen14Practice: React.FC<Screen14PracticeProps> = ({ onNavigate }
                     </span>
                   )}
                   <span className="stat-pill">
-                    <strong>{Math.round((typed.length / passage.length) * 100)}%</strong> Done
+                    <strong>{typingState.progressPercent}%</strong> Done
                   </span>
                 </div>
               </div>
 
-              <div className="practice-text-box mt-3 font-mono">
-                <span className="typed-completed-badge">{typed}</span>
-                <span className="blinking-cursor">|</span>
-                <span className="typed-remaining-text">{passage.slice(typed.length)}</span>
-              </div>
+              {/* Dedicated Character-by-Character Reading Box */}
+              <div 
+                className={`race-passage-card ${isFocused ? 'focused' : ''} ${typingState.hasError ? 'has-error' : ''}`}
+                onClick={focusInput}
+              >
+                {!isFocused && (
+                  <div className="typing-focus-reminder">
+                    Click here or start typing to resume
+                  </div>
+                )}
 
-              <input 
-                ref={inputRef}
-                type="text"
-                className="hidden-typing-input"
-                value={typed}
-                onChange={handleInput}
-                autoFocus
-              />
+                <div className="passage-char-flow">
+                  {typingState.diff.map((char) => {
+                    const isSpace = char.expected === ' ';
+                    if (char.status === 'correct') {
+                      return (
+                        <span key={char.index} className="char char-correct">
+                          {char.expected}
+                        </span>
+                      );
+                    }
+                    if (char.status === 'incorrect') {
+                      return (
+                        <span 
+                          key={char.index} 
+                          className="char char-incorrect"
+                          title={`Typo: typed '${char.typed || ''}', expected '${char.expected}'`}
+                        >
+                          {isSpace ? '␣' : (char.typed || char.expected)}
+                        </span>
+                      );
+                    }
+                    if (char.status === 'current') {
+                      return (
+                        <span key={char.index} className="char char-current">
+                          <span className="cursor-caret" />
+                          {char.expected}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span key={char.index} className="char char-upcoming">
+                        {char.expected}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* Native Full-Coverage Overlay Input */}
+                <input 
+                  ref={inputRef}
+                  type="text" 
+                  className="passage-native-input"
+                  value={typed}
+                  onChange={handleInput}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  autoFocus
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  aria-label="Practice passage typing input"
+                />
+              </div>
             </div>
           )}
 
